@@ -29,10 +29,11 @@ Runs ads for JotPsych targeting BH clinicians and SMB clinic decision-makers on 
 
 ## Current State of Ads (as of Mar 22, 2026)
 
-### Ownership Transition
-Adam Harrison ran paid ads through mid-March. Marketing is now transitioning to Nate.
-Adam is producing structured handover docs (Meta account, Google Ads, Customer.io, creative assets, website).
-Key relationships being transferred: Matt (Meta contractor, $4K/mo), Jenna (Google rep, recurring call).
+### Team
+Adam Harrison — marketing lead, full account history across Meta and Google.
+Matt — Meta contractor, knows the account structure.
+Jenna — Google Ads rep, recurring call.
+Chris Hume — sales, SDR routing for lead form leads.
 
 ### Performance History (Feb–Mar 2026, discovery survey attribution)
 | Week | Spend | First Notes | CpFN |
@@ -51,15 +52,15 @@ CpFN swings wildly week-to-week. No consistent trend — feast and famine patter
   Lead form experiment launched Mar 11 showing early promise: 17–37 leads at ~$63/lead in 3 days at $200/day.
 - **Google** — Non-brand paused, reallocated to Meta. Branded-only at ~$400/wk.
   Google tag is broken — showing 2 conversions in-platform vs. 15 in Metabase UTMs. Needs engineering fix.
-- **LinkedIn** — On backburner per Adam.
+- **LinkedIn** — On backburner.
 
 ### Known Issues
 1. **2FA broke conversion tracking.** SMS verification for signups disrupted both Google tag firing and Meta optimization signals. Timing of perf degradation matches exactly.
 2. **Attribution is a mess.** Meta and Google double-count conversions (view-through overlap). Discovery survey is treated as canonical but it's self-reported. No deduplication model exists.
 3. **Creative assets are scattered.** Across Drive, inbox, Meta, Figma — no single source of truth. This engine is meant to fix that.
-4. **Matt's GoMarble tool.** Contractor uses MCP-based tool for automated creative analysis. Decide whether to replace with this engine or integrate.
+4. **Existing analysis tool.** A contractor uses an MCP-based tool (GoMarble) for automated creative analysis. Decide whether to replace with this engine or integrate.
 
-### Creative Learnings (from Adam's weekly tests)
+### Creative Learnings (from weekly tests)
 - **What works:** UGC-style video, motion/energy, get to product fast, visual proof of product in action, highlighting specific tasks, audit-risk angle showed early promise
 - **What doesn't:** Static/boring, slow to show product, generic scripts
 - **Best CpFN seen:** $64/note (winner promoted from farm to scale, Feb 1–7 week)

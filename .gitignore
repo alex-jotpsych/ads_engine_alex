@@ -10,3 +10,6 @@ build/
 venv/
 node_modules/
 .DS_Store
+
+# Local Netlify folder
+.netlify
