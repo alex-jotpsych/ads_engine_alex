@@ -27,13 +27,15 @@ Runs ads for JotPsych targeting BH clinicians and SMB clinic decision-makers on 
 - Slack integration — auto-updates on deploys, kills, scale-ups, daily digest
 - Data stored locally initially (data/) — migrate to proper warehouse when volume demands it
 
-## Current State of Ads (as of Mar 22, 2026)
+## Current State of Ads (as of Mar 25, 2026)
 
 ### Team
-Adam Harrison — marketing lead, full account history across Meta and Google.
+Adam Harrison — marketing lead, full account history across Meta and Google. Sharing Meta API read-access keys with Alex.
 Matt — Meta contractor, knows the account structure.
 Jenna — Google Ads rep, recurring call.
 Chris Hume — sales, SDR routing for lead form leads.
+Alex Nikolaev — intern, owns creative generation pipeline. Has working OpenAI/DALL-E prototype with review dashboard.
+Daniel Chadda — intern, owns creative design + LoRA experimentation. Repo cloned, cloud code set up. Delivering initial examples by 2026-03-26.
 
 ### Performance History (Feb–Mar 2026, discovery survey attribution)
 | Week | Spend | First Notes | CpFN |
@@ -66,6 +68,26 @@ CpFN swings wildly week-to-week. No consistent trend — feast and famine patter
 - **Best CpFN seen:** $64/note (winner promoted from farm to scale, Feb 1–7 week)
 - **Kill threshold in practice:** ~$300+/note after sufficient spend
 
-## For the Intern
+## Prototype Status (as of Mar 25, 2026)
+
+### What Exists
+- Alex has OpenAI (DALL-E) API wired to a review dashboard rendering generated images from prompts
+- Gallery format matches Meta ad layout (headlines + descriptions in place)
+- Still "wiring stage" — image quality is slop, prompt engineering needed
+
+### Agreed Direction (from 3/25 kickoff)
+1. **Rich ad component framework** — every element of an ad (CTA, value prop, hook, narrative structure, imagery style, emotional register) defined and generated coherently as a unit
+2. **Concept → 20 variants** — human originates the concept (e.g. "famous movie psychiatrists"), engine handles all tactical variant creation (cropping, copy variations, image sourcing/generation)
+3. **Feedback loop** — weekly review sessions (Nate + Jackson), critique captured via voice notes, synthesized into MD files that feed the generation context window. Preferences accumulate.
+4. **Creative quality tactics** — AI images/video not lifelike enough yet. Use techniques like: rapid succession of stills for implied motion, slight modifications to real photos, style/negative prompts. Be "wiley" not just API-dependent.
+5. **No Meta write access yet** — read-only until quality is proven. Adam sending API keys for read access.
+6. **Image generation exploration** — DALL-E primary, Gemini worth testing (Google ecosystem has video/photo advantages). LoRA models on Daniel's radar.
+
+### Open Workstreams
+- Alex: prompt engineering for coherent multi-element ad generation, negative/style prompts, dashboard iteration
+- Daniel: creative design research (dimensions, placement, best practices), LoRA experimentation, initial examples by 3/26
+- Regression pipeline: not started yet, Alex excited about it — decompose creative elements into MECE taxonomy
+
+## For the Interns
 See brief.html for the full project brief, open questions, and ownership areas.
 The scaffolding is built. Your job is to make it real.
