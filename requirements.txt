@@ -20,7 +20,7 @@ scipy>=1.12.0
 
 # Image generation (intern: add based on chosen provider)
 # replicate  # for Flux
-# openai     # for DALL-E
+openai     # for DALL-E
 # ideogram   # for Ideogram
 
 # Video generation (intern: add based on chosen provider)

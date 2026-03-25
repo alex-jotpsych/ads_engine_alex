@@ -1,23 +1,21 @@
 """
 Creative Generator — takes briefs, produces ad variants with auto-taxonomy tagging.
 
-This is the module the intern owns most heavily. The scaffolding is here;
-the actual image/video generation pipeline needs to be built out.
-
-Key decisions for the intern:
-- Which image generation tool(s)? (Midjourney, Flux, DALL-E, Ideogram, etc.)
-- How to ensure output doesn't look like AI slop?
-- Can we do video? What tools? (Runway, Pika, Kling, etc.)
-- How to maintain brand consistency across variants?
-- How to generate copy variants that don't all sound the same?
+Copy generation uses Claude (Anthropic).
+Image generation uses OpenAI (DALL-E 3) for single_image formats.
+Video generation is not yet implemented — video variants get placeholder paths.
 """
 
 from __future__ import annotations
 
+import base64
 import json
+import os
+from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
+from openai import OpenAI
 
 from engine.models import (
     CreativeBrief,
@@ -69,16 +67,39 @@ For each variant, also provide taxonomy tags. Output JSON array:
 """
 
 
+IMAGE_PROMPT_TEMPLATE = """Create a Meta (Facebook/Instagram) feed ad image for a healthcare SaaS product called JotPsych.
+
+Ad headline: {headline}
+Visual direction: {visual_direction}
+Visual style: {visual_style}
+Color mood: {color_mood}
+Subject matter: {subject_matter}
+
+Requirements:
+- Clean, professional ad layout suitable for a Facebook/Instagram feed
+- 1080x1080 pixels (square format for Meta feed)
+- The image should feel authentic and human — NOT like generic stock art or obvious AI
+- If the visual style is "photography", make it look like a real photo
+- If "text_heavy", include the headline text prominently in the image
+- Warm, trustworthy feel appropriate for healthcare professionals
+- Do NOT include any JotPsych logo or watermark
+- Do NOT include any text unless the visual style is "text_heavy" or "mixed_media"
+"""
+
+
 class CreativeGenerator:
     """
     Generates ad variants from creative briefs.
 
-    Copy generation uses Claude. Image/video generation is stubbed —
-    the intern needs to wire up the actual asset generation pipeline.
+    Copy generation uses Claude (Anthropic).
+    Image generation uses OpenAI DALL-E 3 for single_image formats.
+    Video formats get placeholder paths (not yet implemented).
     """
 
     def __init__(self, client: Optional[Anthropic] = None):
         self.client = client or Anthropic()
+        api_key = os.getenv("IMAGE_GEN_API_KEY")
+        self.openai_client = OpenAI(api_key=api_key) if api_key else None
 
     def generate_copy(self, brief: CreativeBrief) -> list[dict]:
         """Generate copy variants with taxonomy tags from a brief."""
@@ -114,25 +135,53 @@ Formats: {[f.value for f in brief.formats_requested]}
 
         return json.loads(text.strip())
 
+    def generate_image(self, brief: CreativeBrief, copy_data: dict, index: int) -> str:
+        """Generate a single ad image via OpenAI DALL-E 3. Returns the saved file path."""
+        assets_dir = Path("data/creatives") / brief.id
+        assets_dir.mkdir(parents=True, exist_ok=True)
+
+        taxonomy = copy_data["taxonomy"]
+        prompt = IMAGE_PROMPT_TEMPLATE.format(
+            headline=copy_data["headline"],
+            visual_direction=brief.visual_direction,
+            visual_style=taxonomy.get("visual_style", "photography"),
+            color_mood=taxonomy.get("color_mood", "brand_primary"),
+            subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
+        )
+
+        response = self.openai_client.images.generate(
+            model="dall-e-3",
+            prompt=prompt,
+            n=1,
+            size="1024x1024",
+            quality="standard",
+            response_format="b64_json",
+        )
+
+        image_data = base64.b64decode(response.data[0].b64_json)
+        file_path = assets_dir / f"variant_{index}.png"
+        file_path.write_bytes(image_data)
+
+        print(f"  [IMG] Generated {file_path}")
+        return str(file_path)
+
     def generate_assets(self, brief: CreativeBrief, copy_variants: list[dict]) -> list[str]:
         """
         Generate visual assets for each copy variant.
-
-        STUB — intern implements this.
-
-        Should return a list of file paths to generated assets.
-        Consider:
-        - Image generation API (Flux, Midjourney, DALL-E, Ideogram)
-        - Video generation (Runway, Pika, Kling)
-        - Brand consistency checks
-        - Resolution/aspect ratio per platform+placement
-        - Anti-AI-slop quality filter
+        - single_image: generates real images via OpenAI DALL-E 3
+        - video: placeholder path (not yet implemented)
         """
         asset_paths = []
         for i, variant in enumerate(copy_variants):
-            # PLACEHOLDER: generates a manifest file instead of actual assets
-            # Intern replaces this with real image/video generation
-            path = f"data/creatives/{brief.id}/variant_{i}.json"
+            if self.openai_client:
+                try:
+                    path = self.generate_image(brief, variant, i)
+                except Exception as e:
+                    print(f"  [IMG] Failed for variant {i}: {e}")
+                    path = f"data/creatives/{brief.id}/variant_{i}_placeholder.json"
+            else:
+                print(f"  [IMG] No IMAGE_GEN_API_KEY set — skipping image generation")
+                path = f"data/creatives/{brief.id}/variant_{i}_placeholder.json"
             asset_paths.append(path)
         return asset_paths
 
@@ -146,15 +195,20 @@ Formats: {[f.value for f in brief.formats_requested]}
         for copy_data, asset_path in zip(copy_variants, asset_paths):
             tax_data = copy_data["taxonomy"]
 
-            # Fill in structural taxonomy fields from the brief
             for fmt in brief.formats_requested:
                 for platform in brief.platforms:
                     taxonomy = CreativeTaxonomy(
                         **tax_data,
                         format=fmt,
                         platform=platform,
-                        placement="feed",  # Default; expand per platform logic
+                        placement="feed",
                     )
+
+                    # Use the real image for single_image, placeholder for video
+                    if fmt == AdFormat.SINGLE_IMAGE:
+                        variant_asset = asset_path
+                    else:
+                        variant_asset = asset_path.replace(".png", "_video_placeholder.json")
 
                     variant = AdVariant(
                         brief_id=brief.id,
@@ -162,7 +216,7 @@ Formats: {[f.value for f in brief.formats_requested]}
                         primary_text=copy_data["primary_text"],
                         description=copy_data.get("description", ""),
                         cta_button=copy_data.get("cta_button", "Learn More"),
-                        asset_path=asset_path,
+                        asset_path=variant_asset,
                         asset_type="image" if fmt != AdFormat.VIDEO else "video",
                         taxonomy=taxonomy,
                         status=AdStatus.DRAFT,

@@ -74,7 +74,7 @@ class CreativeBrief(BaseModel):
     # Generation config
     num_variants: int = 6
     formats_requested: list[AdFormat] = [AdFormat.SINGLE_IMAGE, AdFormat.VIDEO]
-    platforms: list[Platform] = [Platform.META, Platform.GOOGLE]
+    platforms: list[Platform] = [Platform.META]
 
 
 # ---------------------------------------------------------------------------

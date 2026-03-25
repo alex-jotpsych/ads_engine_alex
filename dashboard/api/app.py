@@ -20,6 +20,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from engine.store import Store
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve generated image assets from data/creatives/
+app.mount("/assets", StaticFiles(directory="data/creatives"), name="assets")
 
 # Initialize services
 store = Store()

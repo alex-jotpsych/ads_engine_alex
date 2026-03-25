@@ -78,13 +78,20 @@
 
         .card .asset {
             width: 100%;
-            aspect-ratio: 1.91 / 1;
+            aspect-ratio: 1 / 1;
             background: #1a1a1a;
             display: flex;
             align-items: center;
             justify-content: center;
             color: #444;
             font-size: 13px;
+            overflow: hidden;
+        }
+
+        .card .asset img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         .card .content {
@@ -229,7 +236,7 @@
 
             gallery.innerHTML = variants.map(v => `
                 <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}" onclick="toggleSelect('${v.id}')">
-                    <div class="asset">${v.asset_type === 'video' ? '▶ Video' : '📷 Image'} — ${v.taxonomy.format}</div>
+                    <div class="asset">${getAssetHtml(v)}</div>
                     <div class="content">
                         <div class="headline">${escapeHtml(v.headline)}</div>
                         <div class="primary-text">${escapeHtml(v.primary_text)}</div>
@@ -293,6 +300,15 @@
             closeRejectModal();
             selectedIds.clear();
             loadReviewQueue();
+        }
+
+        function getAssetHtml(v) {
+            if (v.asset_path && v.asset_path.endsWith('.png')) {
+                // Convert data/creatives/{brief_id}/variant_X.png → /assets/{brief_id}/variant_X.png
+                const assetUrl = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
+                return `<img src="${assetUrl}" alt="${escapeHtml(v.headline)}" />`;
+            }
+            return v.asset_type === 'video' ? '▶ Video (not yet generated)' : 'No image';
         }
 
         function escapeHtml(str) {

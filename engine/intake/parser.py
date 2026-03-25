@@ -45,7 +45,7 @@ Output a JSON object with these fields:
     "key_phrases": ["specific language to use"],
     "num_variants": 6,
     "formats_requested": ["single_image", "video"],
-    "platforms": ["meta", "google"]
+    "platforms": ["meta"]
 }
 
 Be specific. Don't be generic. If the input is vague, make sharp creative choices and note them.
