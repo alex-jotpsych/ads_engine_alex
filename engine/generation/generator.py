@@ -2,20 +2,19 @@
 Creative Generator — takes briefs, produces ad variants with auto-taxonomy tagging.
 
 Copy generation uses Claude (Anthropic).
-Image generation uses OpenAI (DALL-E 3) for single_image formats.
-Video generation is not yet implemented — video variants get placeholder paths.
+Image generation is handled by pluggable strategies (see strategies.py):
+  - imagen: Google Imagen 3 (photorealistic / illustration)
+  - dalle: OpenAI DALL-E 3 (fallback)
+  - html_css: Claude generates HTML/CSS layout, Playwright screenshots it
 """
 
 from __future__ import annotations
 
-import base64
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
 from anthropic import Anthropic
-from openai import OpenAI
 
 from engine.models import (
     CreativeBrief,
@@ -23,6 +22,11 @@ from engine.models import (
     CreativeTaxonomy,
     AdFormat,
     AdStatus,
+)
+from engine.generation.strategies import (
+    ImageStrategy,
+    get_strategy,
+    get_available_strategies,
 )
 
 
@@ -39,6 +43,9 @@ CRITICAL: Do NOT write like an AI. No "revolutionize", no "streamline your workf
 no "in today's fast-paced world". Write like a human copywriter who has talked to
 100 burned-out therapists. Be specific. Be real.
 
+The visual_style for ALL variants MUST be set to: "{visual_style}"
+This is the user's chosen generation method — do not override it.
+
 For each variant, also provide taxonomy tags. Output JSON array:
 [
     {{
@@ -51,7 +58,7 @@ For each variant, also provide taxonomy tags. Output JSON array:
             "hook_type": "question|statistic|testimonial|provocative_claim|scenario|direct_benefit",
             "cta_type": "try_free|book_demo|learn_more|see_how|start_saving_time|watch_video",
             "tone": "clinical|warm|urgent|playful|authoritative|empathetic",
-            "visual_style": "photography|illustration|screen_capture|text_heavy|mixed_media|abstract",
+            "visual_style": "{visual_style}",
             "subject_matter": "clinician_at_work|patient_interaction|product_ui|workflow_comparison|conceptual|data_viz",
             "color_mood": "brand_primary|warm_earth|cool_clinical|high_contrast|muted_soft|bold_saturated",
             "text_density": "headline_only|headline_subhead|detailed_copy|minimal_overlay",
@@ -67,24 +74,56 @@ For each variant, also provide taxonomy tags. Output JSON array:
 """
 
 
-IMAGE_PROMPT_TEMPLATE = """Create a Meta (Facebook/Instagram) feed ad image for a healthcare SaaS product called JotPsych.
+# Maps visual_style values to their generation strategy
+VISUAL_STYLE_TO_STRATEGY = {
+    # AI image generation styles
+    "photography": "imagen",
+    "illustration": "imagen",
+    "mixed_media": "imagen",
+    # HTML/CSS generation styles
+    "text_heavy": "html_css",
+    "abstract": "html_css",
+    "screen_capture": "html_css",
+}
 
-Ad headline: {headline}
-Visual direction: {visual_direction}
-Visual style: {visual_style}
-Color mood: {color_mood}
-Subject matter: {subject_matter}
 
-Requirements:
-- Clean, professional ad layout suitable for a Facebook/Instagram feed
-- 1080x1080 pixels (square format for Meta feed)
-- The image should feel authentic and human — NOT like generic stock art or obvious AI
-- If the visual style is "photography", make it look like a real photo
-- If "text_heavy", include the headline text prominently in the image
-- Warm, trustworthy feel appropriate for healthcare professionals
-- Do NOT include any JotPsych logo or watermark
-- Do NOT include any text unless the visual style is "text_heavy" or "mixed_media"
-"""
+def prompt_visual_style() -> tuple[str, str]:
+    """Interactive CLI prompt for the user to choose a visual style.
+    Returns (visual_style, strategy_name)."""
+
+    available = get_available_strategies()
+
+    styles = [
+        ("photography", "imagen", "Photorealistic — real people, offices, candid moments"),
+        ("illustration", "imagen", "Illustrated — stylized, artistic, hand-drawn feel"),
+        ("mixed_media", "imagen", "Mixed media — photos combined with graphic elements"),
+        ("text_heavy", "html_css", "Text-heavy graphic — bold typography, gradients, patterns"),
+        ("abstract", "html_css", "Abstract graphic — geometric shapes, color blocks, modern"),
+        ("screen_capture", "html_css", "Product UI — app screenshots, workflow mockups"),
+    ]
+
+    print("\n--- Visual Style Selection ---")
+    valid_choices = []
+    for i, (style, strategy, desc) in enumerate(styles, 1):
+        if strategy in available:
+            status = ""
+            valid_choices.append(i)
+        else:
+            status = " [unavailable — missing API key]"
+        print(f"  {i}. {style:<16} {desc}{status}")
+
+    while True:
+        try:
+            choice = input(f"\nSelect visual style [1-{len(styles)}]: ").strip()
+            idx = int(choice) - 1
+            if 0 <= idx < len(styles) and (idx + 1) in valid_choices:
+                style, strategy, desc = styles[idx]
+                print(f"  → Using {style} ({strategy} strategy)\n")
+                return style, strategy
+            else:
+                print("  Invalid choice or strategy unavailable. Try again.")
+        except (ValueError, EOFError):
+            print("  Please enter a number.")
 
 
 class CreativeGenerator:
@@ -92,19 +131,27 @@ class CreativeGenerator:
     Generates ad variants from creative briefs.
 
     Copy generation uses Claude (Anthropic).
-    Image generation uses OpenAI DALL-E 3 for single_image formats.
+    Image generation is delegated to a pluggable strategy.
     Video formats get placeholder paths (not yet implemented).
     """
 
-    def __init__(self, client: Optional[Anthropic] = None):
+    def __init__(self, client: Optional[Anthropic] = None, strategy: Optional[ImageStrategy] = None):
         self.client = client or Anthropic()
-        api_key = os.getenv("IMAGE_GEN_API_KEY")
-        self.openai_client = OpenAI(api_key=api_key) if api_key else None
+        self.strategy = strategy
+        self.visual_style: Optional[str] = None
+
+    def set_strategy(self, strategy_name: str) -> None:
+        """Set the image generation strategy by name."""
+        self.strategy = get_strategy(strategy_name)
 
     def generate_copy(self, brief: CreativeBrief) -> list[dict]:
         """Generate copy variants with taxonomy tags from a brief."""
 
-        prompt = COPY_GENERATION_PROMPT.format(num_variants=brief.num_variants)
+        visual_style = self.visual_style or "photography"
+        prompt = COPY_GENERATION_PROMPT.format(
+            num_variants=brief.num_variants,
+            visual_style=visual_style,
+        )
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -135,53 +182,22 @@ Formats: {[f.value for f in brief.formats_requested]}
 
         return json.loads(text.strip())
 
-    def generate_image(self, brief: CreativeBrief, copy_data: dict, index: int) -> str:
-        """Generate a single ad image via OpenAI DALL-E 3. Returns the saved file path."""
+    def generate_assets(self, brief: CreativeBrief, copy_variants: list[dict]) -> list[str]:
+        """Generate visual assets using the configured strategy."""
         assets_dir = Path("data/creatives") / brief.id
         assets_dir.mkdir(parents=True, exist_ok=True)
 
-        taxonomy = copy_data["taxonomy"]
-        prompt = IMAGE_PROMPT_TEMPLATE.format(
-            headline=copy_data["headline"],
-            visual_direction=brief.visual_direction,
-            visual_style=taxonomy.get("visual_style", "photography"),
-            color_mood=taxonomy.get("color_mood", "brand_primary"),
-            subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
-        )
-
-        response = self.openai_client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            n=1,
-            size="1024x1024",
-            quality="standard",
-            response_format="b64_json",
-        )
-
-        image_data = base64.b64decode(response.data[0].b64_json)
-        file_path = assets_dir / f"variant_{index}.png"
-        file_path.write_bytes(image_data)
-
-        print(f"  [IMG] Generated {file_path}")
-        return str(file_path)
-
-    def generate_assets(self, brief: CreativeBrief, copy_variants: list[dict]) -> list[str]:
-        """
-        Generate visual assets for each copy variant.
-        - single_image: generates real images via OpenAI DALL-E 3
-        - video: placeholder path (not yet implemented)
-        """
         asset_paths = []
         for i, variant in enumerate(copy_variants):
-            if self.openai_client:
+            if self.strategy:
                 try:
-                    path = self.generate_image(brief, variant, i)
+                    path = self.strategy.generate_image(brief, variant, i, assets_dir)
                 except Exception as e:
-                    print(f"  [IMG] Failed for variant {i}: {e}")
-                    path = f"data/creatives/{brief.id}/variant_{i}_placeholder.json"
+                    print(f"  [ERROR] Failed for variant {i}: {e}")
+                    path = str(assets_dir / f"variant_{i}_placeholder.json")
             else:
-                print(f"  [IMG] No IMAGE_GEN_API_KEY set — skipping image generation")
-                path = f"data/creatives/{brief.id}/variant_{i}_placeholder.json"
+                print(f"  [SKIP] No image strategy configured — skipping generation")
+                path = str(assets_dir / f"variant_{i}_placeholder.json")
             asset_paths.append(path)
         return asset_paths
 
@@ -204,7 +220,6 @@ Formats: {[f.value for f in brief.formats_requested]}
                         placement="feed",
                     )
 
-                    # Use the real image for single_image, placeholder for video
                     if fmt == AdFormat.SINGLE_IMAGE:
                         variant_asset = asset_path
                     else:

@@ -192,6 +192,13 @@ if __name__ == "__main__":
                 print("Usage: python -m engine.orchestrator idea 'your idea here'")
                 sys.exit(1)
             idea = " ".join(sys.argv[2:])
+
+            # Interactive visual style selection
+            from engine.generation.generator import prompt_visual_style
+            visual_style, strategy_name = prompt_visual_style()
+            orchestrator.generator.visual_style = visual_style
+            orchestrator.generator.set_strategy(strategy_name)
+
             result = orchestrator.submit_idea(idea)
             print(f"Brief: {result['brief_id']}")
             print(f"Variants generated: {result['variants_generated']}")

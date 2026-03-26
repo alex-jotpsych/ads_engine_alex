@@ -39,13 +39,13 @@ class Settings(BaseSettings):
     SLACK_WEBHOOK_URL: str = ""
     SLACK_CHANNEL: str = "#ads-engine"
 
-    # -- Image Generation (intern fills in based on chosen tool) --
-    IMAGE_GEN_API_KEY: str = ""
-    IMAGE_GEN_PROVIDER: str = ""           # "midjourney", "flux", "dalle", "ideogram"
+    # -- Image Generation --
+    OPENAI_API_KEY: str = ""               # For DALL-E 3
+    GOOGLE_GEMINI_API_KEY: str = ""        # For Imagen 3
 
-    # -- Video Generation (intern fills in if applicable) --
+    # -- Video Generation (future — Veo 3 via Gemini API) --
     VIDEO_GEN_API_KEY: str = ""
-    VIDEO_GEN_PROVIDER: str = ""           # "runway", "pika", "kling"
+    VIDEO_GEN_PROVIDER: str = ""
 
     # -- Decision Engine Thresholds --
     MIN_SPEND_FOR_DECISION: float = 50.0
