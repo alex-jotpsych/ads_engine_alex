@@ -15,6 +15,9 @@ Endpoints:
 
 from __future__ import annotations
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from datetime import date
 from typing import Optional
 
@@ -71,6 +74,11 @@ class ReviewAction(BaseModel):
 class ImageFeedback(BaseModel):
     variant_id: Optional[str] = None
     feedback: str
+
+
+class ImageLike(BaseModel):
+    variant_id: str
+    note: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -146,10 +154,12 @@ async def submit_image_feedback(fb: ImageFeedback):
     visual_style = None
     strategy_name = None
     taxonomy = None
+    asset_path = None
 
     if fb.variant_id:
         try:
             variant = store.get_variant(fb.variant_id)
+            asset_path = variant.asset_path
             taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
             if taxonomy:
                 visual_style = taxonomy.get("visual_style")
@@ -164,11 +174,52 @@ async def submit_image_feedback(fb: ImageFeedback):
         visual_style=visual_style,
         strategy_name=strategy_name,
         taxonomy=taxonomy,
+        asset_path=asset_path,
+    )
+
+    response = {
+        "status": "processed",
+        "notes_file": result["notes_file"],
+        "updated_notes": result["updated_notes"],
+    }
+    if result.get("config_updates"):
+        response["config_updates"] = result["config_updates"]
+    return response
+
+
+@app.post("/api/feedback/like")
+async def like_image(like: ImageLike):
+    """Like a generated image — saves it as a positive reference and updates style notes.
+
+    The image is copied to the appropriate liked_photo/ or liked_graphic/ directory
+    based on the variant's visual_style, and Claude updates the style notes with
+    what makes this image good.
+    """
+    visual_style = None
+    asset_path = None
+    taxonomy = None
+
+    try:
+        variant = store.get_variant(like.variant_id)
+        asset_path = variant.asset_path
+        taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
+        if taxonomy:
+            visual_style = taxonomy.get("visual_style")
+    except (FileNotFoundError, Exception):
+        pass
+
+    result = feedback_processor.process_like(
+        visual_style=visual_style,
+        asset_path=asset_path,
+        note=like.note,
+        taxonomy=taxonomy,
+        variant_id=like.variant_id,
     )
 
     return {
-        "status": "processed",
+        "status": "liked",
         "notes_file": result["notes_file"],
+        "reference_path": result["reference_path"],
         "updated_notes": result["updated_notes"],
     }
 

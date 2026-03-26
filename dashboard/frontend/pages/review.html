@@ -161,6 +161,25 @@
             background: #f59e0b30;
         }
 
+        .card .like-btn {
+            display: inline-block;
+            margin-top: 8px;
+            margin-left: 8px;
+            padding: 6px 14px;
+            border-radius: 6px;
+            background: #22c55e20;
+            border: 1px solid #22c55e40;
+            color: #22c55e;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .card .like-btn:hover {
+            background: #22c55e30;
+        }
+
         .style-notes-btn {
             padding: 8px 16px;
             border-radius: 6px;
@@ -255,6 +274,135 @@
             padding: 80px 40px;
             color: #666;
         }
+
+        /* --- Expanded card modal --- */
+        .expand-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 150;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .expand-overlay.active { display: flex; }
+
+        .expand-container {
+            display: flex;
+            gap: 32px;
+            max-width: 1100px;
+            max-height: 90vh;
+            width: 100%;
+        }
+
+        .expand-image {
+            flex: 0 0 auto;
+            max-width: 540px;
+            max-height: 90vh;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .expand-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            cursor: zoom-in;
+            transition: transform 0.2s ease;
+        }
+
+        .expand-image img.zoomed {
+            cursor: zoom-out;
+            transform: scale(2);
+            transform-origin: center center;
+        }
+
+        .expand-details {
+            flex: 1;
+            overflow-y: auto;
+            color: #e0e0e0;
+        }
+
+        .expand-details .expand-headline {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 16px;
+            line-height: 1.3;
+        }
+
+        .expand-details .expand-primary-text {
+            font-size: 15px;
+            color: #bbb;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .expand-details .expand-description {
+            font-size: 14px;
+            color: #999;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            padding: 12px;
+            background: #0a0a0a;
+            border-radius: 8px;
+            border: 1px solid #1a1a1a;
+        }
+
+        .expand-details .expand-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .expand-details .expand-tag {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            color: #888;
+        }
+
+        .expand-details .expand-cta {
+            display: inline-block;
+            padding: 8px 18px;
+            border-radius: 6px;
+            background: #3b82f620;
+            color: #3b82f6;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .expand-details .expand-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #1a1a1a;
+        }
+
+        .expand-close {
+            position: fixed;
+            top: 20px;
+            right: 28px;
+            background: none;
+            border: none;
+            color: #666;
+            font-size: 28px;
+            cursor: pointer;
+            z-index: 160;
+            transition: color 0.15s;
+        }
+
+        .expand-close:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -302,7 +450,27 @@
         </div>
     </div>
 
+    <div class="notes-modal" id="likeModal">
+        <div class="modal-content">
+            <h3 style="color: #fff; margin-bottom: 4px;">Like This Style</h3>
+            <p style="color: #888; font-size: 13px;">This image will be saved as a reference for future generations. Optionally describe what you like about it.</p>
+            <textarea id="likeNote" placeholder="(Optional) e.g. 'Love the warm color palette and the way the headline dominates the layout'"></textarea>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button onclick="closeLikeModal()" style="padding: 8px 16px; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; color: #ccc; cursor: pointer;">Cancel</button>
+                <button onclick="submitLike()" id="likeSubmitBtn" style="padding: 8px 16px; background: #22c55e20; border: 1px solid #22c55e40; border-radius: 6px; color: #22c55e; cursor: pointer;">Save as Reference</button>
+            </div>
+        </div>
+    </div>
+
     <div class="feedback-toast" id="feedbackToast"></div>
+
+    <div class="expand-overlay" id="expandOverlay" onclick="if(event.target===this)closeExpand()">
+        <button class="expand-close" onclick="closeExpand()">&times;</button>
+        <div class="expand-container">
+            <div class="expand-image" id="expandImage"></div>
+            <div class="expand-details" id="expandDetails"></div>
+        </div>
+    </div>
 
     <script>
         const API_BASE = 'http://localhost:8000';
@@ -329,7 +497,7 @@
             }
 
             gallery.innerHTML = variants.map(v => `
-                <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}" onclick="toggleSelect('${v.id}')">
+                <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}" onclick="toggleSelect('${v.id}')" ondblclick="event.stopPropagation(); expandVariant('${v.id}')">
                     <div class="asset">${getAssetHtml(v)}</div>
                     <div class="content">
                         <div class="headline">${escapeHtml(v.headline)}</div>
@@ -341,6 +509,7 @@
                             <span class="tag">${v.taxonomy.platform}</span>
                         </div>
                         <div class="cta-badge">${escapeHtml(v.cta_button)}</div>
+                        <span class="like-btn" onclick="event.stopPropagation(); openLikeModal('${v.id}')">Like</span>
                         <span class="feedback-btn" onclick="event.stopPropagation(); openFeedbackModal('${v.id}')">Feedback</span>
                     </div>
                 </div>
@@ -461,6 +630,53 @@
             }
         }
 
+        // --- Like Style ---
+
+        let likeVariantId = null;
+
+        function openLikeModal(variantId) {
+            likeVariantId = variantId;
+            document.getElementById('likeNote').value = '';
+            document.getElementById('likeModal').classList.add('active');
+            document.getElementById('likeNote').focus();
+        }
+
+        function closeLikeModal() {
+            document.getElementById('likeModal').classList.remove('active');
+            likeVariantId = null;
+        }
+
+        async function submitLike() {
+            const note = document.getElementById('likeNote').value.trim();
+
+            const btn = document.getElementById('likeSubmitBtn');
+            btn.textContent = 'Saving...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/feedback/like`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variant_id: likeVariantId,
+                        note: note || null,
+                    }),
+                });
+                const data = await res.json();
+                closeLikeModal();
+                const fileLabel = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
+                showToast(`Liked — saved as ${fileLabel} reference`);
+                if (document.getElementById('styleNotesPanel').classList.contains('active')) {
+                    loadStyleNotes();
+                }
+            } catch (e) {
+                showToast('Error saving liked image');
+            } finally {
+                btn.textContent = 'Save as Reference';
+                btn.disabled = false;
+            }
+        }
+
         // --- Style Notes Panel ---
 
         async function toggleStyleNotes() {
@@ -489,6 +705,70 @@
                 document.getElementById('styleNotesContent').innerHTML = '<pre style="color:#666;">Could not load style notes.</pre>';
             }
         }
+
+        // --- Expand View ---
+
+        function expandVariant(id) {
+            const v = variants.find(x => x.id === id);
+            if (!v) return;
+
+            // Image panel
+            const imageContainer = document.getElementById('expandImage');
+            if (v.asset_path && v.asset_path.endsWith('.png')) {
+                const assetUrl = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
+                imageContainer.innerHTML = `<img src="${assetUrl}" alt="${escapeHtml(v.headline)}" onclick="this.classList.toggle('zoomed')" />`;
+            } else {
+                imageContainer.innerHTML = '<div style="color:#444;padding:40px;">No image</div>';
+            }
+
+            // Details panel — all taxonomy tags
+            const allTags = v.taxonomy ? Object.entries(v.taxonomy)
+                .filter(([k, val]) => typeof val === 'string' || typeof val === 'boolean' || typeof val === 'number')
+                .map(([k, val]) => `<span class="expand-tag">${k}: ${val}</span>`)
+                .join('') : '';
+
+            document.getElementById('expandDetails').innerHTML = `
+                <div class="expand-headline">${escapeHtml(v.headline)}</div>
+                <div class="expand-primary-text">${escapeHtml(v.primary_text)}</div>
+                ${v.description ? `<div class="expand-description">${escapeHtml(v.description)}</div>` : ''}
+                <div class="expand-cta">${escapeHtml(v.cta_button)}</div>
+                <div class="expand-tags">${allTags}</div>
+                <div class="expand-actions">
+                    <button onclick="event.stopPropagation(); closeExpand(); openLikeModal('${v.id}')" style="padding: 8px 16px; background: #22c55e20; border: 1px solid #22c55e40; border-radius: 6px; color: #22c55e; cursor: pointer; font-size: 13px;">Like Style</button>
+                    <button onclick="event.stopPropagation(); closeExpand(); openFeedbackModal('${v.id}')" style="padding: 8px 16px; background: #f59e0b20; border: 1px solid #f59e0b40; border-radius: 6px; color: #f59e0b; cursor: pointer; font-size: 13px;">Feedback</button>
+                    <button onclick="closeExpand(); selectedIds.add('${v.id}'); renderGallery(); showRejectModal()" style="padding: 8px 16px; background: #ef444420; border: 1px solid #ef444440; border-radius: 6px; color: #ef4444; cursor: pointer; font-size: 13px;">Reject</button>
+                    <button onclick="closeExpand(); approveOne('${v.id}')" style="padding: 8px 16px; background: #3b82f620; border: 1px solid #3b82f640; border-radius: 6px; color: #3b82f6; cursor: pointer; font-size: 13px;">Approve</button>
+                </div>
+            `;
+
+            document.getElementById('expandOverlay').classList.add('active');
+        }
+
+        function closeExpand() {
+            document.getElementById('expandOverlay').classList.remove('active');
+            // Reset zoom on any image
+            const img = document.querySelector('.expand-image img');
+            if (img) img.classList.remove('zoomed');
+        }
+
+        async function approveOne(id) {
+            await fetch(`${API_BASE}/api/review/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
+            });
+            loadReviewQueue();
+        }
+
+        // Close modals on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeExpand();
+                closeRejectModal();
+                closeFeedbackModal();
+                closeLikeModal();
+            }
+        });
 
         // --- Toast ---
 
