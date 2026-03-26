@@ -26,6 +26,38 @@ from typing import Optional
 from anthropic import Anthropic
 
 
+STYLE_REFS_DIR = Path("data/style_references")
+
+
+def load_style_notes(strategy_type: str = "global") -> str:
+    """Load global + strategy-specific style notes for injection into prompts.
+
+    Args:
+        strategy_type: "photo" for Imagen/DALL-E, "graphic" for HTML/CSS, "global" for global-only.
+
+    Returns:
+        Combined style notes string, or empty string if no meaningful notes exist.
+    """
+    parts = []
+
+    # Always load global notes
+    global_path = STYLE_REFS_DIR / "style_notes_global.md"
+    if global_path.exists():
+        content = global_path.read_text().strip()
+        if content and "(no notes yet)" not in content:
+            parts.append(content)
+
+    # Load strategy-specific notes
+    if strategy_type in ("photo", "graphic"):
+        specific_path = STYLE_REFS_DIR / f"style_notes_{strategy_type}.md"
+        if specific_path.exists():
+            content = specific_path.read_text().strip()
+            if content and "(no notes yet)" not in content:
+                parts.append(content)
+
+    return "\n\n---\n\n".join(parts) if parts else ""
+
+
 # ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
@@ -57,13 +89,16 @@ class ImageStrategy(ABC):
 # Google Imagen 3 (via Gemini API)
 # ---------------------------------------------------------------------------
 
-IMAGEN_PROMPT = """Generate a high-quality ad image for a Meta (Facebook/Instagram) feed advertisement.
+IMAGEN_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
 
+Context (for mood only — do NOT illustrate the headline literally):
 Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
-Ad headline: "{headline}"
+Mood reference: "{headline}"
 Visual direction: {visual_direction}
 Color mood: {color_mood}
 Subject: {subject_matter}
+
+THIS IS A SINGLE PHOTOGRAPH — NOT a collage, NOT a before/after, NOT a split screen, NOT a comparison. One unified image with ONE scene, ONE moment, ONE subject.
 
 PHOTOGRAPHIC REQUIREMENTS:
 - Shot on a Canon EOS R5, 35mm lens, f/2.8, natural window light
@@ -73,26 +108,30 @@ PHOTOGRAPHIC REQUIREMENTS:
 - Color grade: slightly warm, lifted shadows, muted highlights — like an indie film still
 
 COMPOSITION:
-- Leave clear space for text overlay (top third or bottom third)
+- ONE single focal point — one person or one object
+- Leave clear negative space for text overlay (top third or bottom third)
 - Square format (1:1 aspect ratio) for Meta feed
 - Subject placed using rule of thirds, not centered
+- Simple, uncluttered background
 
 ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 - Any text, words, letters, logos, watermarks, or UI elements
+- Before/after comparisons, split screens, collages, or side-by-side compositions
+- Multiple panels, frames, borders, or divided sections
 - Overly smooth or plastic-looking skin
 - HDR-overprocessed or oversaturated colors
 - Stock photo poses (thumbs up, pointing at camera, exaggerated smiles)
 - Generic corporate office backgrounds
 - Lens flare or dramatic lighting effects
-- Multiple competing focal points
+- Laptop/phone screens showing UI (unless subject_matter is product_ui)
 """
 
 
 class ImagenStrategy(ImageStrategy):
-    """Google Imagen 3 via the Gemini API."""
+    """Google Imagen 4 via the Gemini API."""
 
     name = "imagen"
-    description = "Google Imagen 3 — photorealistic imagery and illustrations"
+    description = "Google Imagen 4 — photorealistic imagery and illustrations"
 
     def __init__(self):
         self._client = None
@@ -117,12 +156,18 @@ class ImagenStrategy(ImageStrategy):
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
 
+        # Inject global + photo-specific style feedback
+        style_notes = load_style_notes("photo")
+        if style_notes:
+            prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
+
         response = self.client.models.generate_images(
-            model="imagen-3.0-generate-002",
+            model="imagen-4.0-generate-001",
             prompt=prompt,
             config={
                 "number_of_images": 1,
                 "aspect_ratio": "1:1",
+                "person_generation": "allow_adult",
             },
         )
 
@@ -138,13 +183,16 @@ class ImagenStrategy(ImageStrategy):
 # OpenAI DALL-E 3 (fallback)
 # ---------------------------------------------------------------------------
 
-DALLE_PROMPT = """Generate a high-quality ad image for a Meta (Facebook/Instagram) feed advertisement.
+DALLE_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
 
+Context (for mood only — do NOT illustrate the headline literally):
 Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
-Ad headline: "{headline}"
+Mood reference: "{headline}"
 Visual direction: {visual_direction}
 Color mood: {color_mood}
 Subject: {subject_matter}
+
+THIS IS A SINGLE PHOTOGRAPH — NOT a collage, NOT a before/after, NOT a split screen, NOT a comparison. One unified image with ONE scene, ONE moment, ONE subject.
 
 PHOTOGRAPHIC REQUIREMENTS:
 - Shot on a Canon EOS R5, 35mm lens, f/2.8, natural window light
@@ -154,17 +202,22 @@ PHOTOGRAPHIC REQUIREMENTS:
 - Color grade: slightly warm, lifted shadows, muted highlights
 
 COMPOSITION:
-- Leave clear space for text overlay (top third or bottom third)
+- ONE single focal point — one person or one object
+- Leave clear negative space for text overlay (top third or bottom third)
 - Square format (1:1 aspect ratio) for Meta feed
 - Subject placed using rule of thirds, not centered
+- Simple, uncluttered background
 
 ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 - Any text, words, letters, logos, watermarks, or UI elements
+- Before/after comparisons, split screens, collages, or side-by-side compositions
+- Multiple panels, frames, borders, or divided sections
 - Overly smooth or plastic-looking skin
 - HDR-overprocessed or oversaturated colors
 - Stock photo poses (thumbs up, pointing at camera, exaggerated smiles)
 - Generic corporate office backgrounds
 - Lens flare or dramatic lighting effects
+- Laptop/phone screens showing UI (unless subject_matter is product_ui)
 """
 
 
@@ -195,6 +248,11 @@ class DalleStrategy(ImageStrategy):
             color_mood=taxonomy.get("color_mood", "warm_earth"),
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
+
+        # Inject global + photo-specific style feedback
+        style_notes = load_style_notes("photo")
+        if style_notes:
+            prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
 
         response = self.client.images.generate(
             model="dall-e-3",
@@ -312,8 +370,6 @@ class HtmlCssStrategy(ImageStrategy):
     name = "html_css"
     description = "HTML/CSS graphic ads — gradients, typography, patterns (no AI imagery)"
 
-    STYLE_REFS_DIR = Path("data/style_references")
-
     def __init__(self):
         self.anthropic = Anthropic()
 
@@ -324,15 +380,13 @@ class HtmlCssStrategy(ImageStrategy):
         """Load style references to inject into the generation prompt."""
         parts = []
 
-        # Load style notes (free-form human feedback)
-        notes_path = self.STYLE_REFS_DIR / "style_notes.md"
-        if notes_path.exists():
-            notes = notes_path.read_text().strip()
-            if notes:
-                parts.append(f"## Human Feedback on Style\n\n{notes}")
+        # Load global + graphic-specific style notes
+        style_notes = load_style_notes("graphic")
+        if style_notes:
+            parts.append(f"## Reviewer Feedback on Style\n\n{style_notes}")
 
         # Load HTML examples as few-shot references
-        html_examples = sorted(self.STYLE_REFS_DIR.glob("*.html"))
+        html_examples = sorted(STYLE_REFS_DIR.glob("*.html"))
         for i, html_path in enumerate(html_examples[:3]):  # Max 3 examples
             html = html_path.read_text().strip()
             parts.append(
@@ -346,7 +400,7 @@ class HtmlCssStrategy(ImageStrategy):
         """Load reference images to show Claude during critique."""
         images = []
         for ext in ("*.png", "*.jpg", "*.jpeg"):
-            for img_path in sorted(self.STYLE_REFS_DIR.glob(ext))[:3]:  # Max 3
+            for img_path in sorted(STYLE_REFS_DIR.glob(ext))[:3]:  # Max 3
                 img_bytes = img_path.read_bytes()
                 media_type = "image/png" if img_path.suffix == ".png" else "image/jpeg"
                 images.append({

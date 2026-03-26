@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from engine.store import Store
 from engine.intake.parser import IntakeParser
 from engine.generation.generator import CreativeGenerator
+from engine.generation.feedback import FeedbackProcessor
 from engine.review.reviewer import ReviewPipeline
 from engine.decisions.engine import DecisionEngine
 from engine.regression.model import CreativeRegressionModel
@@ -65,6 +66,11 @@ class ReviewAction(BaseModel):
     variant_ids: list[str]
     reviewer: str
     notes: Optional[str] = None
+
+
+class ImageFeedback(BaseModel):
+    variant_id: Optional[str] = None
+    feedback: str
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +126,57 @@ async def reject_variants(action: ReviewAction):
         raise HTTPException(status_code=400, detail="Rejection notes are required")
     rejected = review_pipeline.batch_reject(action.variant_ids, action.reviewer, action.notes)
     return {"rejected": len(rejected)}
+
+
+# ---------------------------------------------------------------------------
+# Image Feedback — iterative prompt refinement
+# ---------------------------------------------------------------------------
+
+feedback_processor = FeedbackProcessor()
+
+
+@app.post("/api/feedback/image")
+async def submit_image_feedback(fb: ImageFeedback):
+    """Submit natural language feedback on a generated image.
+
+    The feedback is processed by Claude, which updates the appropriate
+    style notes file (photo, graphic, or global) based on the variant's
+    visual_style. All future generations of that type pick up the changes.
+    """
+    visual_style = None
+    strategy_name = None
+    taxonomy = None
+
+    if fb.variant_id:
+        try:
+            variant = store.get_variant(fb.variant_id)
+            taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
+            if taxonomy:
+                visual_style = taxonomy.get("visual_style")
+                from engine.generation.strategies import VISUAL_STYLE_STRATEGY_MAP
+                strategy_name = VISUAL_STYLE_STRATEGY_MAP.get(visual_style or "", None)
+        except (FileNotFoundError, Exception):
+            pass  # Proceed without context — feedback still useful
+
+    result = feedback_processor.process_feedback(
+        feedback=fb.feedback,
+        variant_id=fb.variant_id,
+        visual_style=visual_style,
+        strategy_name=strategy_name,
+        taxonomy=taxonomy,
+    )
+
+    return {
+        "status": "processed",
+        "notes_file": result["notes_file"],
+        "updated_notes": result["updated_notes"],
+    }
+
+
+@app.get("/api/feedback/style-notes")
+async def get_style_notes():
+    """Get all style notes files for display in the feedback UI."""
+    return feedback_processor.get_all_notes()
 
 
 # ---------------------------------------------------------------------------
