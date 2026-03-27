@@ -136,6 +136,24 @@ async def reject_variants(action: ReviewAction):
     return {"rejected": len(rejected)}
 
 
+@app.post("/api/review/return-to-review")
+async def return_to_review(action: ReviewAction):
+    """Move variant(s) back to draft status for re-review."""
+    returned = []
+    for vid in action.variant_ids:
+        try:
+            variant = store.get_variant(vid)
+            variant.status = "draft"
+            variant.review_notes = None
+            variant.reviewer = None
+            variant.reviewed_at = None
+            store.save_variant(variant)
+            returned.append(vid)
+        except FileNotFoundError:
+            pass
+    return {"returned": len(returned)}
+
+
 # ---------------------------------------------------------------------------
 # Image Feedback — iterative prompt refinement
 # ---------------------------------------------------------------------------

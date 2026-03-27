@@ -35,7 +35,7 @@ BRAND_CONFIG_PATH = STYLE_REFS_DIR / "brand_config.json"
 # Maps visual_style taxonomy values to their liked image subdirectory
 VISUAL_STYLE_TO_LIKED_DIR = {
     "photography": "liked_photo",
-    "illustration": "liked_photo",
+    "illustration": "liked_illustration",
     "mixed_media": "liked_photo",
     "text_heavy": "liked_graphic",
     "abstract": "liked_graphic",
@@ -45,7 +45,7 @@ VISUAL_STYLE_TO_LIKED_DIR = {
 # Maps visual_style taxonomy values to their style notes file
 VISUAL_STYLE_TO_NOTES_FILE = {
     "photography": "style_notes_photo.md",
-    "illustration": "style_notes_photo.md",
+    "illustration": "style_notes_illustration.md",
     "mixed_media": "style_notes_photo.md",
     "text_heavy": "style_notes_graphic.md",
     "abstract": "style_notes_graphic.md",
@@ -123,7 +123,7 @@ class FeedbackProcessor:
     """Processes user feedback on generated images and updates style guidance."""
 
     def __init__(self):
-        self.client = Anthropic()
+        self.client = Anthropic(max_retries=3)
 
     def process_feedback(
         self,
@@ -480,7 +480,7 @@ If no changes are needed, respond with exactly: NO_CHANGES""",
     def get_all_notes(self) -> dict:
         """Return all style notes files for display in UI."""
         result = {}
-        for filename in ("style_notes_global.md", "style_notes_photo.md", "style_notes_graphic.md"):
+        for filename in ("style_notes_global.md", "style_notes_photo.md", "style_notes_illustration.md", "style_notes_graphic.md"):
             path = STYLE_REFS_DIR / filename
             label = filename.replace("style_notes_", "").replace(".md", "")
             result[label] = self._read_notes(path)

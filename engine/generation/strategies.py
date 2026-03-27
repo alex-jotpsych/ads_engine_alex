@@ -50,7 +50,7 @@ def load_style_notes(strategy_type: str = "global") -> str:
             parts.append(content)
 
     # Load strategy-specific notes
-    if strategy_type in ("photo", "graphic"):
+    if strategy_type in ("photo", "illustration", "graphic"):
         specific_path = STYLE_REFS_DIR / f"style_notes_{strategy_type}.md"
         if specific_path.exists():
             content = specific_path.read_text().strip()
@@ -91,7 +91,7 @@ class ImageStrategy(ABC):
 # Google Imagen 3 (via Gemini API)
 # ---------------------------------------------------------------------------
 
-IMAGEN_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
+IMAGEN_PHOTO_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
 
 Context (for mood only — do NOT illustrate the headline literally):
 Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
@@ -129,6 +129,44 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
+IMAGEN_ILLUSTRATION_PROMPT = """Generate a single cohesive illustration for a Meta (Facebook/Instagram) feed ad.
+
+Context (for mood only — do NOT illustrate the headline literally):
+Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
+Mood reference: "{headline}"
+Visual direction: {visual_direction}
+Color mood: {color_mood}
+Subject: {subject_matter}
+
+THIS IS A STYLIZED ILLUSTRATION — NOT a photograph, NOT photorealistic, NOT 3D rendered. It should look hand-drawn, editorial, or digitally illustrated.
+
+ILLUSTRATION STYLE:
+- Modern editorial illustration style — think New Yorker covers, Headspace app, Calm app, or Slack marketing illustrations
+- Flat or semi-flat design with subtle texture (grain, paper texture, soft brush strokes)
+- Limited color palette: 3-5 colors maximum. Use deep navy-indigo, soft blush pink, vibrant pink, warm yellow, and electric purple tones. Keep it warm and approachable.
+- Soft, rounded shapes — organic forms, not sharp geometric
+- If a person is present: simplified, stylized human figure (not realistic proportions). Expressive pose, minimal facial detail. Think Notion or Linear-style character art.
+- Warm, approachable, calming mood — this is for therapists, not corporate execs
+
+COMPOSITION:
+- ONE single focal point — one character or one central visual metaphor
+- Leave clear negative space for text overlay (top third or bottom third)
+- Square format (1:1 aspect ratio) for Meta feed
+- Subject placed using rule of thirds, not centered
+- Simple, uncluttered background — solid color or soft gradient
+
+ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
+- Any text, words, letters, logos, watermarks, or UI elements
+- Photorealistic rendering, 3D renders, or AI-generated "uncanny valley" faces
+- Before/after comparisons, split screens, collages, or side-by-side compositions
+- Multiple panels, frames, borders, or divided sections
+- Clip art or generic stock illustration style
+- Overly complex scenes with many characters or objects
+- Dark, moody, or corporate aesthetics
+- Lens flare, shadows, or photographic lighting effects
+"""
+
+
 class ImagenStrategy(ImageStrategy):
     """Google Imagen 4 via the Gemini API."""
 
@@ -151,15 +189,24 @@ class ImagenStrategy(ImageStrategy):
 
     def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path) -> str:
         taxonomy = copy_data["taxonomy"]
-        prompt = IMAGEN_PROMPT.format(
+        visual_style = taxonomy.get("visual_style", "photography")
+
+        # Pick prompt template based on visual style
+        if visual_style == "illustration":
+            prompt_template = IMAGEN_ILLUSTRATION_PROMPT
+        else:
+            prompt_template = IMAGEN_PHOTO_PROMPT
+
+        prompt = prompt_template.format(
             headline=copy_data["headline"],
             visual_direction=brief.visual_direction,
             color_mood=taxonomy.get("color_mood", "warm_earth"),
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
 
-        # Inject global + photo-specific style feedback
-        style_notes = load_style_notes("photo")
+        # Inject style feedback specific to the visual style
+        notes_type = "illustration" if visual_style == "illustration" else "photo"
+        style_notes = load_style_notes(notes_type)
         if style_notes:
             prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
 
@@ -185,7 +232,7 @@ class ImagenStrategy(ImageStrategy):
 # OpenAI DALL-E 3 (fallback)
 # ---------------------------------------------------------------------------
 
-DALLE_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
+DALLE_PHOTO_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
 
 Context (for mood only — do NOT illustrate the headline literally):
 Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
@@ -223,6 +270,44 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
+DALLE_ILLUSTRATION_PROMPT = """Generate a single cohesive illustration for a Meta (Facebook/Instagram) feed ad.
+
+Context (for mood only — do NOT illustrate the headline literally):
+Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
+Mood reference: "{headline}"
+Visual direction: {visual_direction}
+Color mood: {color_mood}
+Subject: {subject_matter}
+
+THIS IS A STYLIZED ILLUSTRATION — NOT a photograph, NOT photorealistic, NOT 3D rendered. It should look hand-drawn, editorial, or digitally illustrated.
+
+ILLUSTRATION STYLE:
+- Modern editorial illustration style — think New Yorker covers, Headspace app, Calm app, or Slack marketing illustrations
+- Flat or semi-flat design with subtle texture (grain, paper texture, soft brush strokes)
+- Limited color palette: 3-5 colors maximum. Use deep navy-indigo, soft blush pink, vibrant pink, warm yellow, and electric purple tones. Keep it warm and approachable.
+- Soft, rounded shapes — organic forms, not sharp geometric
+- If a person is present: simplified, stylized human figure (not realistic proportions). Expressive pose, minimal facial detail. Think Notion or Linear-style character art.
+- Warm, approachable, calming mood — this is for therapists, not corporate execs
+
+COMPOSITION:
+- ONE single focal point — one character or one central visual metaphor
+- Leave clear negative space for text overlay (top third or bottom third)
+- Square format (1:1 aspect ratio) for Meta feed
+- Subject placed using rule of thirds, not centered
+- Simple, uncluttered background — solid color or soft gradient
+
+ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
+- Any text, words, letters, logos, watermarks, or UI elements
+- Photorealistic rendering, 3D renders, or AI-generated "uncanny valley" faces
+- Before/after comparisons, split screens, collages, or side-by-side compositions
+- Multiple panels, frames, borders, or divided sections
+- Clip art or generic stock illustration style
+- Overly complex scenes with many characters or objects
+- Dark, moody, or corporate aesthetics
+- Lens flare, shadows, or photographic lighting effects
+"""
+
+
 class DalleStrategy(ImageStrategy):
     """OpenAI DALL-E 3."""
 
@@ -244,15 +329,23 @@ class DalleStrategy(ImageStrategy):
 
     def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path) -> str:
         taxonomy = copy_data["taxonomy"]
-        prompt = DALLE_PROMPT.format(
+        visual_style = taxonomy.get("visual_style", "photography")
+
+        if visual_style == "illustration":
+            prompt_template = DALLE_ILLUSTRATION_PROMPT
+        else:
+            prompt_template = DALLE_PHOTO_PROMPT
+
+        prompt = prompt_template.format(
             headline=copy_data["headline"],
             visual_direction=brief.visual_direction,
             color_mood=taxonomy.get("color_mood", "warm_earth"),
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
 
-        # Inject global + photo-specific style feedback
-        style_notes = load_style_notes("photo")
+        # Inject style feedback specific to the visual style
+        notes_type = "illustration" if visual_style == "illustration" else "photo"
+        style_notes = load_style_notes(notes_type)
         if style_notes:
             prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
 
@@ -455,7 +548,11 @@ class HtmlCssStrategy(ImageStrategy):
         return HtmlCssStrategy._brand_logo_svg
 
     def _load_font_face_css(self) -> str:
-        """Load @font-face CSS using file:// URLs. Only for Playwright rendering, never for prompts."""
+        """Load @font-face CSS with base64-encoded fonts. Only for Playwright rendering, never for prompts.
+
+        Chromium blocks file:// URLs for @font-face when page is loaded via
+        set_content(), so we must use data: URIs with base64-encoded TTFs.
+        """
         if HtmlCssStrategy._brand_font_faces is not None:
             return HtmlCssStrategy._brand_font_faces
         fonts = [
@@ -465,11 +562,11 @@ class HtmlCssStrategy(ImageStrategy):
         parts = []
         for family, ttf_path in fonts:
             if ttf_path.exists():
-                abs_path = ttf_path.resolve().as_uri()  # file:///absolute/path
+                b64 = base64.b64encode(ttf_path.read_bytes()).decode("utf-8")
                 parts.append(
                     f"@font-face {{\n"
                     f"  font-family: '{family}';\n"
-                    f"  src: url('{abs_path}') format('truetype');\n"
+                    f"  src: url('data:font/ttf;base64,{b64}') format('truetype');\n"
                     f"  font-weight: 100 900;\n"
                     f"  font-display: swap;\n"
                     f"}}"

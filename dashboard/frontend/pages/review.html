@@ -180,6 +180,39 @@
             background: #22c55e30;
         }
 
+        .archive-filter {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #333;
+            background: #1a1a1a;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+        .archive-filter:hover { background: #252525; color: #ccc; }
+        .archive-filter.active { background: #3b82f620; border-color: #3b82f640; color: #3b82f6; }
+
+        .card .status-badge {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .status-badge.approved { background: #22c55e20; color: #22c55e; }
+        .status-badge.rejected { background: #ef444420; color: #ef4444; }
+        .status-badge.draft { background: #3b82f620; color: #3b82f6; }
+
+        .card .review-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 6px;
+        }
+
         .style-notes-btn {
             padding: 8px 16px;
             border-radius: 6px;
@@ -407,15 +440,23 @@
 </head>
 <body>
     <div class="header">
-        <h1>Review Queue</h1>
+        <h1 id="pageTitle">Review Queue</h1>
         <div class="stats" id="stats">Loading...</div>
     </div>
 
     <div class="toolbar">
-        <button class="approve" onclick="approveSelected()">Approve Selected</button>
-        <button class="reject" onclick="showRejectModal()">Reject Selected</button>
-        <button onclick="selectAll()">Select All</button>
-        <button onclick="clearSelection()">Clear</button>
+        <button id="viewToggle" onclick="toggleViewMode()" style="border-color: #3b82f640; color: #3b82f6;">Show Archive</button>
+        <span id="archiveFilters" style="display:none;">
+            <button class="archive-filter active" data-status="all" onclick="setArchiveFilter('all')">All</button>
+            <button class="archive-filter" data-status="approved" onclick="setArchiveFilter('approved')">Approved</button>
+            <button class="archive-filter" data-status="rejected" onclick="setArchiveFilter('rejected')">Rejected</button>
+        </span>
+        <span id="reviewActions">
+            <button class="approve" onclick="approveSelected()">Approve Selected</button>
+            <button class="reject" onclick="showRejectModal()">Reject Selected</button>
+            <button onclick="selectAll()">Select All</button>
+            <button onclick="clearSelection()">Clear</button>
+        </span>
         <button class="style-notes-btn" onclick="toggleStyleNotes()">Style Notes</button>
     </div>
 
@@ -476,6 +517,67 @@
         const API_BASE = 'http://localhost:8000';
         let selectedIds = new Set();
         let variants = [];
+        let viewMode = 'review';  // 'review' or 'archive'
+        let archiveFilter = 'all';
+
+        function toggleViewMode() {
+            viewMode = viewMode === 'review' ? 'archive' : 'review';
+            const btn = document.getElementById('viewToggle');
+            const filters = document.getElementById('archiveFilters');
+            const actions = document.getElementById('reviewActions');
+            const title = document.getElementById('pageTitle');
+
+            if (viewMode === 'archive') {
+                btn.textContent = 'Back to Review';
+                filters.style.display = 'inline';
+                actions.style.display = 'none';
+                title.textContent = 'Archive';
+                loadArchive();
+            } else {
+                btn.textContent = 'Show Archive';
+                filters.style.display = 'none';
+                actions.style.display = 'inline';
+                title.textContent = 'Review Queue';
+                loadReviewQueue();
+            }
+            selectedIds.clear();
+        }
+
+        function setArchiveFilter(status) {
+            archiveFilter = status;
+            document.querySelectorAll('.archive-filter').forEach(b => {
+                b.classList.toggle('active', b.dataset.status === status);
+            });
+            loadArchive();
+        }
+
+        async function loadArchive() {
+            try {
+                // "All" in archive context means approved + rejected (no drafts)
+                let url;
+                if (archiveFilter === 'all') {
+                    // Fetch both approved and rejected, merge them
+                    const [approvedRes, rejectedRes] = await Promise.all([
+                        fetch(`${API_BASE}/api/variants?status=approved`),
+                        fetch(`${API_BASE}/api/variants?status=rejected`),
+                    ]);
+                    const approved = await approvedRes.json();
+                    const rejected = await rejectedRes.json();
+                    variants = [...approved.variants, ...rejected.variants];
+                    // Sort by most recently reviewed first
+                    variants.sort((a, b) => (b.reviewed_at || '').localeCompare(a.reviewed_at || ''));
+                } else {
+                    url = `${API_BASE}/api/variants?status=${archiveFilter}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    variants = data.variants;
+                }
+                renderGallery();
+                document.getElementById('stats').textContent = `${variants.length} variants`;
+            } catch (e) {
+                document.getElementById('gallery').innerHTML = '<div class="empty-state">Cannot connect to API.</div>';
+            }
+        }
 
         async function loadReviewQueue() {
             try {
@@ -492,11 +594,22 @@
         function renderGallery() {
             const gallery = document.getElementById('gallery');
             if (!variants.length) {
-                gallery.innerHTML = '<div class="empty-state">No variants pending review. Submit an idea to get started.</div>';
+                const msg = viewMode === 'archive'
+                    ? 'No variants found.'
+                    : 'No variants pending review. Submit an idea to get started.';
+                gallery.innerHTML = `<div class="empty-state">${msg}</div>`;
                 return;
             }
 
-            gallery.innerHTML = variants.map(v => `
+            gallery.innerHTML = variants.map(v => {
+                const statusBadge = viewMode === 'archive'
+                    ? `<span class="status-badge ${v.status}">${v.status}</span>` : '';
+                const reviewInfo = viewMode === 'archive' && v.reviewed_at
+                    ? `<div class="review-info">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</div>` : '';
+                const reviewNotes = viewMode === 'archive' && v.review_notes
+                    ? `<div class="review-info" style="color:#999; margin-top:4px;">"${escapeHtml(v.review_notes)}"</div>` : '';
+
+                return `
                 <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}" onclick="toggleSelect('${v.id}')" ondblclick="event.stopPropagation(); expandVariant('${v.id}')">
                     <div class="asset">${getAssetHtml(v)}</div>
                     <div class="content">
@@ -509,11 +622,12 @@
                             <span class="tag">${v.taxonomy.platform}</span>
                         </div>
                         <div class="cta-badge">${escapeHtml(v.cta_button)}</div>
+                        ${statusBadge}${reviewInfo}${reviewNotes}
                         <span class="like-btn" onclick="event.stopPropagation(); openLikeModal('${v.id}')">Like</span>
                         <span class="feedback-btn" onclick="event.stopPropagation(); openFeedbackModal('${v.id}')">Feedback</span>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
         function toggleSelect(id) {
@@ -540,7 +654,7 @@
                 body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate' }),
             });
             selectedIds.clear();
-            loadReviewQueue();
+            viewMode === 'archive' ? loadArchive() : loadReviewQueue();
         }
 
         function showRejectModal() {
@@ -555,15 +669,24 @@
 
         async function rejectSelected() {
             const notes = document.getElementById('rejectNotes').value;
-            if (!notes.trim()) return;
-            await fetch(`${API_BASE}/api/review/reject`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate', notes }),
-            });
-            closeRejectModal();
-            selectedIds.clear();
-            loadReviewQueue();
+            if (!notes.trim()) {
+                showToast('Please enter rejection feedback');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_BASE}/api/review/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate', notes }),
+                });
+                const data = await res.json();
+                closeRejectModal();
+                selectedIds.clear();
+                showToast(`Rejected ${data.rejected} variant(s)`);
+                viewMode === 'archive' ? loadArchive() : loadReviewQueue();
+            } catch (e) {
+                showToast('Error rejecting variants: ' + e.message);
+            }
         }
 
         function getAssetHtml(v) {
@@ -727,17 +850,25 @@
                 .map(([k, val]) => `<span class="expand-tag">${k}: ${val}</span>`)
                 .join('') : '';
 
+            const reviewActions = `
+                    <button onclick="closeExpand(); selectedIds.add('${v.id}'); renderGallery(); showRejectModal()" style="padding: 8px 16px; background: #ef444420; border: 1px solid #ef444440; border-radius: 6px; color: #ef4444; cursor: pointer; font-size: 13px;">Reject</button>
+                    <button onclick="closeExpand(); approveOne('${v.id}')" style="padding: 8px 16px; background: #3b82f620; border: 1px solid #3b82f640; border-radius: 6px; color: #3b82f6; cursor: pointer; font-size: 13px;">Approve</button>`;
+            const archiveActions = `
+                    <button onclick="closeExpand(); returnToReview('${v.id}')" style="padding: 8px 16px; background: #3b82f620; border: 1px solid #3b82f640; border-radius: 6px; color: #3b82f6; cursor: pointer; font-size: 13px;">Return to Review</button>`;
+            const statusInfo = viewMode === 'archive'
+                ? `<div style="margin-top:12px;"><span class="status-badge ${v.status}">${v.status}</span>${v.reviewed_at ? `<span style="color:#666;font-size:12px;margin-left:8px;">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</span>` : ''}${v.review_notes ? `<div style="color:#999;font-size:12px;margin-top:6px;">"${escapeHtml(v.review_notes)}"</div>` : ''}</div>` : '';
+
             document.getElementById('expandDetails').innerHTML = `
                 <div class="expand-headline">${escapeHtml(v.headline)}</div>
                 <div class="expand-primary-text">${escapeHtml(v.primary_text)}</div>
                 ${v.description ? `<div class="expand-description">${escapeHtml(v.description)}</div>` : ''}
                 <div class="expand-cta">${escapeHtml(v.cta_button)}</div>
                 <div class="expand-tags">${allTags}</div>
+                ${statusInfo}
                 <div class="expand-actions">
                     <button onclick="event.stopPropagation(); closeExpand(); openLikeModal('${v.id}')" style="padding: 8px 16px; background: #22c55e20; border: 1px solid #22c55e40; border-radius: 6px; color: #22c55e; cursor: pointer; font-size: 13px;">Like Style</button>
                     <button onclick="event.stopPropagation(); closeExpand(); openFeedbackModal('${v.id}')" style="padding: 8px 16px; background: #f59e0b20; border: 1px solid #f59e0b40; border-radius: 6px; color: #f59e0b; cursor: pointer; font-size: 13px;">Feedback</button>
-                    <button onclick="closeExpand(); selectedIds.add('${v.id}'); renderGallery(); showRejectModal()" style="padding: 8px 16px; background: #ef444420; border: 1px solid #ef444440; border-radius: 6px; color: #ef4444; cursor: pointer; font-size: 13px;">Reject</button>
-                    <button onclick="closeExpand(); approveOne('${v.id}')" style="padding: 8px 16px; background: #3b82f620; border: 1px solid #3b82f640; border-radius: 6px; color: #3b82f6; cursor: pointer; font-size: 13px;">Approve</button>
+                    ${viewMode === 'archive' ? archiveActions : reviewActions}
                 </div>
             `;
 
@@ -751,13 +882,23 @@
             if (img) img.classList.remove('zoomed');
         }
 
+        async function returnToReview(id) {
+            await fetch(`${API_BASE}/api/review/return-to-review`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
+            });
+            showToast('Returned to review queue');
+            loadArchive();
+        }
+
         async function approveOne(id) {
             await fetch(`${API_BASE}/api/review/approve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
             });
-            loadReviewQueue();
+            viewMode === 'archive' ? loadArchive() : loadReviewQueue();
         }
 
         // Close modals on Escape key
