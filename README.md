@@ -140,11 +140,18 @@ The HTML/CSS strategy uses JotPsych's official brand kit:
 - **Typography:** Archivo (headings) and Inter (body) — variable TTFs loaded from `data/style_references/brand/fonts/`, base64-encoded and injected at Playwright render time
 - **Logo:** SVG loaded from `data/style_references/brand/logos/`, injected into a `<div class="jotpsych-logo">` placeholder after Claude generates the HTML — Claude never handles raw SVG data
 
+### Illustration vs. Photography
+
+Options 1 (photography) and 2 (illustration) use separate prompt templates with distinct aesthetic constraints:
+- **Photography prompt** — camera specs (Canon EOS R5, 35mm, f/2.8), real locations, candid moments, shallow DOF
+- **Illustration prompt** — flat/semi-flat editorial style, limited 3–5 color palette, simplified character art (Headspace/Calm/Notion aesthetic), no photorealism
+
 ### Style References & Feedback Loop
 
 The engine learns from reviewer feedback and reference materials. Style guidance is split by visual type:
 - `style_notes_global.md` — applies to all strategies
-- `style_notes_photo.md` — photography, illustration, mixed_media (Imagen/DALL-E)
+- `style_notes_photo.md` — photography and mixed_media (Imagen/DALL-E)
+- `style_notes_illustration.md` — illustration only (separate from photo)
 - `style_notes_graphic.md` — text_heavy, abstract, screen_capture (HTML/CSS)
 
 Feedback submitted through the dashboard is routed to the correct file based on the variant's visual style. See the **Feedback Loop** section below for details.
@@ -171,12 +178,16 @@ data/
     │   ├── logos/              # SVG logos (primary_dark, primary_light, logomark_*)
     │   └── fonts/             # Archivo-Variable.ttf, Inter-Variable.ttf
     ├── brand_config.json      # Tunable numeric params (logo size, font ranges, padding)
-    ├── style_notes_global.md  # Cross-cutting style preferences
-    ├── style_notes_photo.md   # Photo/illustration/mixed_media guidance
-    ├── style_notes_graphic.md # Text-heavy/abstract/screen_capture guidance
-    ├── liked_photo/           # Liked photo references (auto-populated)
-    ├── liked_graphic/         # Liked graphic references (auto-populated)
-    └── (example images/HTML)  # Manual reference ads
+    ├── brand_config.json          # Tunable numeric params (logo size, font ranges, padding)
+    ├── style_notes_global.md      # Cross-cutting style preferences (all strategies)
+    ├── style_notes_photo.md       # Photography + mixed_media guidance
+    ├── style_notes_illustration.md# Illustration-only guidance
+    ├── style_notes_graphic.md     # Text-heavy/abstract/screen_capture guidance
+    ├── product_context.md         # JotPsych product facts, stats, testimonials for copy (planned)
+    ├── liked_photo/               # Liked photo references (auto-populated on Like)
+    ├── liked_illustration/        # Liked illustration references (auto-populated on Like)
+    ├── liked_graphic/             # Liked graphic references (auto-populated on Like)
+    └── (example images/HTML)      # Manual reference ads
 ```
 
 ---
@@ -198,19 +209,22 @@ dashboard/frontend/pages/review.html
 **User interaction:**
 - Click cards to select, then "Approve Selected" or "Reject Selected" (rejection requires feedback notes)
 - **Double-click** a card to expand it — full image with zoom, all text, taxonomy tags, and single-variant actions
-- **Like** a variant to save it as a positive reference — the image is copied to `liked_photo/` or `liked_graphic/` (by visual type), and Claude updates "What We Like" in the corresponding style notes
+- **Like** a variant to save it as a positive reference — the image is copied to the appropriate `liked_*/` directory by visual type, and Claude updates "What We Like" in the corresponding style notes file
 - **Feedback** button lets you type natural language feedback on a specific variant — Claude sees the actual image and updates the correct style notes file. If the feedback targets numeric parameters (e.g. "make the logo bigger"), `brand_config.json` is also updated
 
 ### Variant Lifecycle & Viewing Previous Batches
 
-Every generated variant starts in `draft` status. The review dashboard shows **only draft variants** — once you approve or reject them, they leave the review queue but are **not deleted**. You do not need to manually delete old creatives.
+Every generated variant starts in `draft` status. The review dashboard shows **only draft variants** — once you approve or reject them, they leave the review queue but are **not deleted**.
 
-To view variants across all batches:
+**Archive mode:** Click "Show Archive" in the dashboard to view all previously approved and rejected variants. Filter by All / Approved / Rejected. Each card shows the status badge, reviewer, review notes, and timestamp.
+
+**Return to Review:** From the archive, you can send any variant back to `draft` status using the "Return to Review" button in the expanded card view.
+
+To view variants via API:
 - **All variants:** `GET /api/variants` — returns everything regardless of status
 - **By status:** `GET /api/variants?status=draft`, `?status=approved`, `?status=rejected`
-- **Review dashboard:** Only shows `draft` variants (pending review)
 
-Each new `idea` run generates a fresh batch of draft variants. Previous batches that were approved/rejected won't clutter the review queue — they're still in `data/creatives/variants/` and accessible via the API if needed.
+Each new `idea` run generates a fresh batch of draft variants. Previous approved/rejected batches won't appear in the review queue.
 
 ---
 
@@ -226,13 +240,19 @@ Each new `idea` run generates a fresh batch of draft variants. Previous batches 
 5. If feedback targets numeric values (logo size, font size, padding), `brand_config.json` is also updated
 6. All future generations pick up the changes automatically
 
-**Qualitative feedback** (colors, mood, composition) updates `style_notes_*.md` files.
+**Qualitative feedback** (colors, mood, composition) updates `style_notes_*.md` files, routed by visual style:
+- photography → `style_notes_photo.md`
+- illustration → `style_notes_illustration.md`
+- mixed_media → `style_notes_photo.md`
+- text_heavy / abstract / screen_capture → `style_notes_graphic.md`
 
 **Quantitative feedback** (logo size, text size, padding) updates `data/style_references/brand_config.json`, which directly controls the values in the generation prompt.
 
 **Like system:** Liked images are saved as positive references and used in two ways:
 - PNG files shown to Claude during the critique pass as "this is what good looks like"
 - HTML source files (for HTML/CSS variants) included as few-shot examples in the generation prompt
+
+Liked images are saved to the correct directory by visual type: `liked_photo/`, `liked_illustration/`, or `liked_graphic/`.
 
 ---
 
@@ -291,6 +311,7 @@ These values are injected into the generation prompt. The feedback processor can
 | `/api/review` | GET | Get all variants pending review |
 | `/api/review/approve` | POST | Approve variant(s) for deployment |
 | `/api/review/reject` | POST | Reject variant(s) with feedback notes |
+| `/api/review/return-to-review` | POST | Reset archived variant(s) back to draft status |
 | `/api/feedback/image` | POST | Submit natural language feedback on a generated image |
 | `/api/feedback/like` | POST | Like an image — save as reference, update style notes |
 | `/api/feedback/style-notes` | GET | Get all style notes files for display |
