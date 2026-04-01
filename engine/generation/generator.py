@@ -87,6 +87,80 @@ VISUAL_STYLE_TO_STRATEGY = {
 }
 
 
+def prompt_num_variants() -> int:
+    """Interactive CLI prompt for number of copy variants. Returns int."""
+    options = [
+        (2,  "2 variants — quick test"),
+        (4,  "4 variants — small batch"),
+        (6,  "6 variants — standard (default)"),
+        (8,  "8 variants — wider coverage"),
+        (12, "12 variants — broad sweep"),
+    ]
+    print("\n--- Number of Variants ---")
+    for i, (n, desc) in enumerate(options, 1):
+        print(f"  {i}. {n:<4} {desc}")
+    while True:
+        try:
+            choice = input(f"\nSelect number of variants [1-{len(options)}]: ").strip()
+            idx = int(choice) - 1
+            if 0 <= idx < len(options):
+                n, _ = options[idx]
+                print(f"  → Generating {n} variants\n")
+                return n
+            else:
+                print("  Invalid choice. Try again.")
+        except (ValueError, EOFError):
+            print("  Please enter a number.")
+
+
+def prompt_formats() -> list[str]:
+    """Interactive CLI prompt for asset format(s). Returns list of format strings."""
+    options = [
+        (["single_image"],           "Image only — fastest, generates PNGs"),
+        (["video"],                  "Video only — placeholder (video gen not yet built)"),
+        (["single_image", "video"],  "Both image and video"),
+    ]
+    print("\n--- Asset Format ---")
+    for i, (fmts, desc) in enumerate(options, 1):
+        print(f"  {i}. {', '.join(fmts):<26} {desc}")
+    while True:
+        try:
+            choice = input(f"\nSelect format [1-{len(options)}]: ").strip()
+            idx = int(choice) - 1
+            if 0 <= idx < len(options):
+                fmts, _ = options[idx]
+                print(f"  → Using {', '.join(fmts)}\n")
+                return fmts
+            else:
+                print("  Invalid choice. Try again.")
+        except (ValueError, EOFError):
+            print("  Please enter a number.")
+
+
+def prompt_aspect_ratio() -> str:
+    """Interactive CLI prompt for aspect ratio selection. Returns ratio string."""
+    ratios = [
+        ("1:1",  "Meta feed — square (1080×1080)"),
+        ("4:5",  "Meta portrait feed (1080×1350)"),
+        ("9:16", "Stories / Reels — full vertical (1080×1920)"),
+    ]
+    print("\n--- Aspect Ratio ---")
+    for i, (ratio, desc) in enumerate(ratios, 1):
+        print(f"  {i}. {ratio:<6} {desc}")
+    while True:
+        try:
+            choice = input(f"\nSelect aspect ratio [1-{len(ratios)}]: ").strip()
+            idx = int(choice) - 1
+            if 0 <= idx < len(ratios):
+                ratio, desc = ratios[idx]
+                print(f"  → Using {ratio}\n")
+                return ratio
+            else:
+                print("  Invalid choice. Try again.")
+        except (ValueError, EOFError):
+            print("  Please enter a number.")
+
+
 def prompt_visual_style() -> tuple[str, str]:
     """Interactive CLI prompt for the user to choose a visual style.
     Returns (visual_style, strategy_name)."""
@@ -139,6 +213,7 @@ class CreativeGenerator:
         self.client = client or Anthropic()
         self.strategy = strategy
         self.visual_style: Optional[str] = None
+        self.aspect_ratio: str = "1:1"
 
     def set_strategy(self, strategy_name: str) -> None:
         """Set the image generation strategy by name."""
@@ -152,6 +227,13 @@ class CreativeGenerator:
             num_variants=brief.num_variants,
             visual_style=visual_style,
         )
+
+        # Inject product context (stats, quotes, key phrases) if available
+        product_context_path = Path("data/style_references/product_context.md")
+        if product_context_path.exists():
+            product_context = product_context_path.read_text().strip()
+            if product_context:
+                prompt += f"\n\n---\n\n## JotPsych Product Facts (ground copy in these — use specific numbers and real language)\n\n{product_context}"
 
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
@@ -191,7 +273,8 @@ Formats: {[f.value for f in brief.formats_requested]}
         for i, variant in enumerate(copy_variants):
             if self.strategy:
                 try:
-                    path = self.strategy.generate_image(brief, variant, i, assets_dir)
+                    path = self.strategy.generate_image(brief, variant, i, assets_dir,
+                                                        aspect_ratio=self.aspect_ratio)
                 except Exception as e:
                     print(f"  [ERROR] Failed for variant {i}: {e}")
                     path = str(assets_dir / f"variant_{i}_placeholder.json")
@@ -218,6 +301,7 @@ Formats: {[f.value for f in brief.formats_requested]}
                         format=fmt,
                         platform=platform,
                         placement="feed",
+                        aspect_ratio=self.aspect_ratio,
                     )
 
                     if fmt == AdFormat.SINGLE_IMAGE:

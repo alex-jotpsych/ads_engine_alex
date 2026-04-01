@@ -34,7 +34,7 @@ open dashboard/frontend/pages/review.html
 │              │     │              │     │                     │     │          │
 │ Raw idea ──▶ │     │ Brief ──▶    │     │ ┌─ imagen (Google)  │     │ JSON     │
 │ Claude       │     │ Claude       │     │ ├─ dalle (OpenAI)   │     │ files in │
-│ structures   │     │ writes 6     │     │ └─ html_css (Claude │     │ data/    │
+│ structures   │     │ writes N     │     │ └─ html_css (Claude │     │ data/    │
 │ into brief   │     │ copy variants│     │    + Playwright)    │     │          │
 └─────────────┘     └──────────────┘     └─────────────────────┘     └──────────┘
                                                                            │
@@ -63,54 +63,13 @@ open dashboard/frontend/pages/review.html
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `python -m engine.orchestrator idea "text"` | Parse idea → generate copy + images → save variants |
-| `python -m engine.orchestrator review` | List all variants pending review |
-| `python -m engine.orchestrator daily` | Run full daily cycle (track → decide → regress → notify) |
-| `python -m engine.orchestrator regression` | Run regression model, output creative playbook |
+### `idea` — generate ads from a concept
 
----
+```bash
+python -m engine.orchestrator idea "Your ad concept here"
+```
 
-## Step 1: Intake (parser.py)
-
-**What it does:** Takes a free-form idea (text, voice transcript, Slack message) and uses Claude to structure it into a `CreativeBrief`.
-
-**Input:** Any text string — can be messy, informal, just a concept.
-
-**Output:** A JSON `CreativeBrief` with structured fields: target_audience, value_proposition, pain_point, desired_action, tone_direction, visual_direction, key_phrases.
-
-**User interaction:** You provide the idea text as a CLI argument.
-
----
-
-## Step 2: Copy Generation (generator.py)
-
-**What it does:** Takes the brief and uses Claude to generate 6 distinct ad copy variants. Each variant includes headline, primary_text, description, CTA button text, and full taxonomy tags.
-
-**Input:** A `CreativeBrief` + the user's chosen visual style.
-
-**Output:** 6 copy variant dicts with taxonomy tags for regression.
-
-**User interaction:** The visual style you selected in the menu gets baked into every variant's taxonomy so it's tracked as a regression variable.
-
----
-
-## Step 3: Image Generation (strategies.py)
-
-**What it does:** Generates one image per copy variant using the strategy you selected.
-
-### Available Strategies
-
-| Strategy | Menu Options | How It Works | Cost/Image |
-|----------|-------------|--------------|------------|
-| **imagen** | 1. photography, 2. illustration, 3. mixed_media | Google Imagen 3 via Gemini API | ~$0.03 |
-| **dalle** | (fallback if no Gemini key) | OpenAI DALL-E 3 | ~$0.04 |
-| **html_css** | 4. text_heavy, 5. abstract, 6. screen_capture | Claude writes HTML/CSS → Playwright screenshots → Claude critiques screenshot → fixes → final screenshot | ~$0.01 |
-
-### Visual Style Selection Menu
-
-When you run `idea`, an interactive prompt appears:
+Running `idea` launches four interactive menus in sequence — no flags required:
 
 ```
 --- Visual Style Selection ---
@@ -122,13 +81,116 @@ When you run `idea`, an interactive prompt appears:
   6. screen_capture   Product UI — app screenshots, workflow mockups
 
 Select visual style [1-6]:
+
+--- Aspect Ratio ---
+  1. 1:1    Meta feed — square (1080×1080)
+  2. 4:5    Meta portrait feed (1080×1350)
+  3. 9:16   Stories / Reels — full vertical (1080×1920)
+
+Select aspect ratio [1-3]:
+
+--- Number of Variants ---
+  1. 2    quick test
+  2. 4    small batch
+  3. 6    standard (default)
+  4. 8    wider coverage
+  5. 12   broad sweep
+
+Select number of variants [1-5]:
+
+--- Asset Format ---
+  1. single_image                Image only — fastest, generates PNGs
+  2. video                       Video only — placeholder (not yet built)
+  3. single_image, video         Both image and video
+
+Select format [1-3]:
 ```
+
+Any menu can be bypassed with a CLI flag — the interactive prompt is skipped for that option:
+
+| Flag | Values | Effect |
+|------|--------|--------|
+| `--aspect-ratio` | `1:1`, `4:5`, `9:16` | Skip aspect ratio prompt |
+| `--variants N` | integer | Skip variants count prompt |
+| `--formats` | `single_image` `video` | Skip format prompt |
+| `--platforms` | `meta` `google` | (no interactive prompt — defaults to `meta`) |
+
+**Examples:**
+
+```bash
+# Fully interactive — prompts for all 4 options
+python -m engine.orchestrator idea "burnout among therapists"
+
+# Skip specific prompts with flags
+python -m engine.orchestrator idea "burnout" --variants 4 --aspect-ratio 9:16
+
+# Fully explicit — no interactive prompts
+python -m engine.orchestrator idea "burnout" --variants 6 --formats single_image --aspect-ratio 1:1 --platforms meta
+```
+
+### Other commands
+
+| Command | Description |
+|---------|-------------|
+| `python -m engine.orchestrator review` | List all variants pending review |
+| `python -m engine.orchestrator daily` | Run full daily cycle (track → decide → regress → notify) |
+| `python -m engine.orchestrator regression` | Run regression model, print creative playbook |
+
+---
+
+## Step 1: Intake (parser.py)
+
+**What it does:** Takes a free-form idea (text, voice transcript, Slack message) and uses Claude to structure it into a `CreativeBrief`.
+
+**Input:** Any text string — can be messy, informal, just a concept.
+
+**Output:** A JSON `CreativeBrief` with structured fields: target_audience, value_proposition, pain_point, desired_action, tone_direction, visual_direction, key_phrases.
+
+---
+
+## Step 2: Copy Generation (generator.py)
+
+**What it does:** Takes the brief and uses Claude to generate N distinct ad copy variants. Each variant includes headline, primary_text, description, CTA button text, and full taxonomy tags.
+
+**Product context grounding:** If `data/style_references/product_context.md` exists, its contents are injected into the generation prompt at runtime. This file holds JotPsych-specific facts (time savings stats, customer quotes, revenue claims, verbatim brand phrases) so copy is grounded in real data rather than generic claims.
+
+**Input:** A `CreativeBrief` + the user's chosen visual style.
+
+**Output:** N copy variant dicts with taxonomy tags for regression.
+
+---
+
+## Step 3: Image Generation (strategies.py)
+
+**What it does:** Generates one image per copy variant using the strategy selected in the visual style menu.
+
+### Available Strategies
+
+| Strategy | Visual Styles | How It Works | Approx Cost |
+|----------|--------------|--------------|-------------|
+| **imagen** | photography, illustration, mixed_media | Google Imagen 3 via Gemini API | ~$0.03/image |
+| **dalle** | (fallback if no Gemini key) | OpenAI DALL-E 3 | ~$0.04/image |
+| **html_css** | text_heavy, abstract, screen_capture | Claude writes HTML/CSS → Playwright screenshots → Claude critiques → fixes → final screenshot | ~$0.01/image |
+
+Strategies that are missing their required API key are shown as `[unavailable]` in the interactive menu.
+
+### Aspect Ratio Support
+
+All three strategies support three canvas sizes:
+
+| Ratio | Canvas | Use Case |
+|-------|--------|----------|
+| 1:1 | 1080×1080 | Meta feed (square) |
+| 4:5 | 1080×1350 | Meta portrait feed |
+| 9:16 | 1080×1920 | Stories / Reels |
+
+The HTML/CSS strategy uses larger typography at taller ratios (9:16 gets 68–88px headlines vs. 58–72px at 1:1). The Playwright viewport is resized to match. Imagen and DALL-E use the native aspect ratio parameters of their respective APIs.
 
 ### HTML/CSS Strategy Details
 
-The HTML/CSS strategy uses a two-pass process:
-1. **Generate:** Claude creates a self-contained HTML file following a strict brand style guide (color palettes, typography, layout rules)
-2. **Critique:** Playwright screenshots the HTML, feeds the screenshot back to Claude, asks it to identify and fix visual issues (alignment, color harmony, hierarchy)
+Two-pass generation process:
+1. **Generate:** Claude creates a self-contained HTML file following the brand style guide (color palettes, typography, layout rules, style notes)
+2. **Critique:** Playwright screenshots the HTML, feeds the image back to Claude, asks it to identify and fix visual issues (alignment, color harmony, hierarchy)
 3. **Fix:** Claude outputs corrected HTML, Playwright takes the final screenshot
 
 Both the HTML source and PNG are saved in `data/creatives/<brief_id>/`.
@@ -136,25 +198,15 @@ Both the HTML source and PNG are saved in `data/creatives/<brief_id>/`.
 ### Brand Kit Integration
 
 The HTML/CSS strategy uses JotPsych's official brand kit:
-- **Colors:** Midnight (#1C1E85), Warm Light (#FFF2F5), Sunset Glow (#FD96C9), Deep Night (#1E125E), Daylight (#FFF3C4), Afterglow (#813FE8) — organized into three palettes (Warm Light, Deep Night, Midnight Bold)
+- **Colors:** Midnight (#1C1E85), Warm Light (#FFF2F5), Sunset Glow (#FD96C9), Deep Night (#1E125E), Daylight (#FFF3C4), Afterglow (#813FE8) — organized into three palettes (Warm Trust, Cool Clinical, Bold Energy)
 - **Typography:** Archivo (headings) and Inter (body) — variable TTFs loaded from `data/style_references/brand/fonts/`, base64-encoded and injected at Playwright render time
 - **Logo:** SVG loaded from `data/style_references/brand/logos/`, injected into a `<div class="jotpsych-logo">` placeholder after Claude generates the HTML — Claude never handles raw SVG data
 
 ### Illustration vs. Photography
 
-Options 1 (photography) and 2 (illustration) use separate prompt templates with distinct aesthetic constraints:
+Options 1 (photography) and 2 (illustration) use separate prompt templates:
 - **Photography prompt** — camera specs (Canon EOS R5, 35mm, f/2.8), real locations, candid moments, shallow DOF
-- **Illustration prompt** — flat/semi-flat editorial style, limited 3–5 color palette, simplified character art (Headspace/Calm/Notion aesthetic), no photorealism
-
-### Style References & Feedback Loop
-
-The engine learns from reviewer feedback and reference materials. Style guidance is split by visual type:
-- `style_notes_global.md` — applies to all strategies
-- `style_notes_photo.md` — photography and mixed_media (Imagen/DALL-E)
-- `style_notes_illustration.md` — illustration only (separate from photo)
-- `style_notes_graphic.md` — text_heavy, abstract, screen_capture (HTML/CSS)
-
-Feedback submitted through the dashboard is routed to the correct file based on the variant's visual style. See the **Feedback Loop** section below for details.
+- **Illustration prompt** — flat/semi-flat editorial style, limited 3–5 color palette, simplified character art (Headspace/Calm/Notion aesthetic), written as flowing prose to prevent Imagen from rendering prompt text visually
 
 ---
 
@@ -168,26 +220,30 @@ data/
 ├── briefs/                    # CreativeBrief JSON files
 ├── creatives/
 │   ├── variants/              # AdVariant JSON files (one per variant)
-│   └── <brief_id>/           # Generated assets (PNG, HTML)
+│   └── <brief_id>/            # Generated assets (PNG, HTML)
 ├── performance/
 │   ├── snapshots/             # Daily performance pulls (STUB)
 │   └── decisions/             # Scale/kill/wait records
 ├── models/                    # Regression results
 └── style_references/          # Style learning & brand assets
     ├── brand/
-    │   ├── logos/              # SVG logos (primary_dark, primary_light, logomark_*)
+    │   ├── logos/             # SVG logos (primary_dark, primary_light, logomark_*)
     │   └── fonts/             # Archivo-Variable.ttf, Inter-Variable.ttf
     ├── brand_config.json      # Tunable numeric params (logo size, font ranges, padding)
-    ├── brand_config.json          # Tunable numeric params (logo size, font ranges, padding)
-    ├── style_notes_global.md      # Cross-cutting style preferences (all strategies)
-    ├── style_notes_photo.md       # Photography + mixed_media guidance
-    ├── style_notes_illustration.md# Illustration-only guidance
-    ├── style_notes_graphic.md     # Text-heavy/abstract/screen_capture guidance
-    ├── product_context.md         # JotPsych product facts, stats, testimonials for copy (planned)
-    ├── liked_photo/               # Liked photo references (auto-populated on Like)
-    ├── liked_illustration/        # Liked illustration references (auto-populated on Like)
-    ├── liked_graphic/             # Liked graphic references (auto-populated on Like)
-    └── (example images/HTML)      # Manual reference ads
+    ├── product_context.md     # JotPsych product facts for copy grounding
+    ├── style_notes_global.md  # Cross-cutting prefs (all strategies)
+    ├── style_notes_photo_1x1.md      # Photography/mixed_media · 1:1
+    ├── style_notes_photo_4x5.md      # Photography/mixed_media · 4:5
+    ├── style_notes_photo_9x16.md     # Photography/mixed_media · 9:16
+    ├── style_notes_illustration_1x1.md
+    ├── style_notes_illustration_4x5.md
+    ├── style_notes_illustration_9x16.md
+    ├── style_notes_graphic_1x1.md    # Text-heavy/abstract/screen_capture · 1:1
+    ├── style_notes_graphic_4x5.md    # Text-heavy/abstract/screen_capture · 4:5
+    ├── style_notes_graphic_9x16.md   # Text-heavy/abstract/screen_capture · 9:16
+    ├── liked_photo/           # Liked photo/mixed_media references
+    ├── liked_illustration/    # Liked illustration references
+    └── liked_graphic/         # Liked graphic references
 ```
 
 ---
@@ -207,52 +263,69 @@ dashboard/frontend/pages/review.html
 ```
 
 **User interaction:**
-- Click cards to select, then "Approve Selected" or "Reject Selected" (rejection requires feedback notes)
+- Click cards to select, then "Approve" or "Reject" (rejection requires feedback notes)
 - **Double-click** a card to expand it — full image with zoom, all text, taxonomy tags, and single-variant actions
-- **Like** a variant to save it as a positive reference — the image is copied to the appropriate `liked_*/` directory by visual type, and Claude updates "What We Like" in the corresponding style notes file
-- **Feedback** button lets you type natural language feedback on a specific variant — Claude sees the actual image and updates the correct style notes file. If the feedback targets numeric parameters (e.g. "make the logo bigger"), `brand_config.json` is also updated
+- Cards show **numbered badges** (#1, #2, #3...) and respect the actual aspect ratio of the generated image
+- **Like** a variant to save it as a positive reference — image copied to the appropriate `liked_*/` directory, Claude updates "What We Like" in the matching style notes file
+- **Feedback** button — type natural language feedback; Claude sees the actual image and updates the correct style notes file; if feedback targets numeric parameters (e.g. "make the logo bigger"), `brand_config.json` is also updated
+- **Voice Feedback** button — upload an audio recording (.m4a, .mp3, .wav) where you reference ads by number ("Ad 2 needs more whitespace, Ad 5 is too dark"). Whisper transcribes it, Claude extracts the (ad number, feedback) pairs, each routed to the correct style notes file
 
 ### Variant Lifecycle & Viewing Previous Batches
 
 Every generated variant starts in `draft` status. The review dashboard shows **only draft variants** — once you approve or reject them, they leave the review queue but are **not deleted**.
 
-**Archive mode:** Click "Show Archive" in the dashboard to view all previously approved and rejected variants. Filter by All / Approved / Rejected. Each card shows the status badge, reviewer, review notes, and timestamp.
+**Archive mode:** Click "Show Archive" to view all previously approved and rejected variants. Filter by All / Approved / Rejected.
 
-**Return to Review:** From the archive, you can send any variant back to `draft` status using the "Return to Review" button in the expanded card view.
+**Return to Review:** From the archive, send any variant back to `draft` using "Return to Review" in the expanded card view.
 
-To view variants via API:
-- **All variants:** `GET /api/variants` — returns everything regardless of status
-- **By status:** `GET /api/variants?status=draft`, `?status=approved`, `?status=rejected`
-
-Each new `idea` run generates a fresh batch of draft variants. Previous approved/rejected batches won't appear in the review queue.
+API access:
+- **All variants:** `GET /api/variants`
+- **By status:** `GET /api/variants?status=draft|approved|rejected`
 
 ---
 
 ## Feedback Loop (feedback.py)
 
-**What it does:** Translates casual reviewer feedback into structured style guidance that feeds future generation.
+**What it does:** Translates reviewer feedback into style guidance that feeds future generation.
 
 **Flow:**
 1. Reviewer sees a generated ad in the dashboard
 2. Clicks "Feedback" and types natural language (e.g. "too much empty space", "body text too small")
 3. `FeedbackProcessor` sends the feedback + the actual image to Claude
-4. Claude updates the appropriate style notes file (routed by visual_style)
-5. If feedback targets numeric values (logo size, font size, padding), `brand_config.json` is also updated
-6. All future generations pick up the changes automatically
+4. Claude updates the appropriate style notes file (routed by visual_style × aspect_ratio)
+5. All future generations for that visual type + ratio pick up the changes automatically
 
-**Qualitative feedback** (colors, mood, composition) updates `style_notes_*.md` files, routed by visual style:
-- photography → `style_notes_photo.md`
-- illustration → `style_notes_illustration.md`
-- mixed_media → `style_notes_photo.md`
-- text_heavy / abstract / screen_capture → `style_notes_graphic.md`
+### Style Notes — 2D Routing
 
-**Quantitative feedback** (logo size, text size, padding) updates `data/style_references/brand_config.json`, which directly controls the values in the generation prompt.
+Feedback is routed to the specific style file for the variant's visual style **and** aspect ratio. This means feedback on a 9:16 illustration doesn't bleed into 1:1 illustrations:
 
-**Like system:** Liked images are saved as positive references and used in two ways:
+| Visual Style | Aspect Ratio | File |
+|---|---|---|
+| photography / mixed_media | 1:1 | `style_notes_photo_1x1.md` |
+| photography / mixed_media | 4:5 | `style_notes_photo_4x5.md` |
+| photography / mixed_media | 9:16 | `style_notes_photo_9x16.md` |
+| illustration | 1:1 | `style_notes_illustration_1x1.md` |
+| illustration | 4:5 | `style_notes_illustration_4x5.md` |
+| illustration | 9:16 | `style_notes_illustration_9x16.md` |
+| text_heavy / abstract / screen_capture | 1:1 | `style_notes_graphic_1x1.md` |
+| text_heavy / abstract / screen_capture | 4:5 | `style_notes_graphic_4x5.md` |
+| text_heavy / abstract / screen_capture | 9:16 | `style_notes_graphic_9x16.md` |
+| unknown / no style | any | `style_notes_global.md` |
+
+**Quantitative feedback** (logo size, text size, padding) updates `brand_config.json` directly.
+
+**Like system:** Liked images are saved as positive references:
 - PNG files shown to Claude during the critique pass as "this is what good looks like"
-- HTML source files (for HTML/CSS variants) included as few-shot examples in the generation prompt
+- HTML source files (for HTML/CSS variants) included as few-shot examples in generation
+- Saved to `liked_photo/`, `liked_illustration/`, or `liked_graphic/` by visual type
 
-Liked images are saved to the correct directory by visual type: `liked_photo/`, `liked_illustration/`, or `liked_graphic/`.
+### Voice Feedback
+
+Upload a recording via the dashboard's "Voice Feedback" button. The backend:
+1. Transcribes the audio with OpenAI Whisper
+2. Uses Claude to extract (ad number, feedback) pairs from the transcript
+3. Matches ad numbers to variant UUIDs using the gallery's display order
+4. Routes each piece of feedback to the correct style notes file
 
 ---
 
@@ -276,24 +349,23 @@ Drop reference materials into `data/style_references/`:
 
 ### Dashboard Feedback (Recommended)
 
-The dashboard provides a more effective workflow than manual file editing:
-
 1. Generate a batch of ads
 2. Review in the dashboard
-3. **Like** ads you want more of — image saved as reference, style notes updated positively
+3. **Like** ads you want more of — image saved as reference, style notes updated
 4. **Feedback** on ads that need improvement — natural language processed into style guidance
 5. Next generation run picks up all changes automatically
 
 ### Brand Config
 
-`data/style_references/brand_config.json` controls tunable numeric parameters:
+`data/style_references/brand_config.json` controls tunable numeric parameters per aspect ratio:
 
 ```json
 {
-    "logo": { "width_px": 160, "top_px": 40, "left_px": 40 },
-    "typography": {
-        "headline_size_range": [52, 72],
-        "body_size_range": [22, 28]
+    "logo": { "width_px": 320, "top_px": 40, "left_px": 40 },
+    "typography_by_ratio": {
+        "1:1":  { "headline_size_range": [58, 72], "body_size_range": [22, 28], "cta_size_range": [20, 24] },
+        "4:5":  { "headline_size_range": [60, 76], "body_size_range": [22, 28], "cta_size_range": [20, 24] },
+        "9:16": { "headline_size_range": [68, 88], "body_size_range": [26, 32], "cta_size_range": [22, 26] }
     },
     "layout": { "padding_min_px": 80 }
 }
@@ -307,13 +379,14 @@ These values are injected into the generation prompt. The feedback processor can
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/intake` | POST | Submit a new idea → parse into brief → generate variants |
+| `/api/intake` | POST | Submit a new idea → parse → generate variants |
 | `/api/review` | GET | Get all variants pending review |
 | `/api/review/approve` | POST | Approve variant(s) for deployment |
 | `/api/review/reject` | POST | Reject variant(s) with feedback notes |
-| `/api/review/return-to-review` | POST | Reset archived variant(s) back to draft status |
+| `/api/review/return-to-review` | POST | Reset archived variant(s) back to draft |
 | `/api/feedback/image` | POST | Submit natural language feedback on a generated image |
 | `/api/feedback/like` | POST | Like an image — save as reference, update style notes |
+| `/api/feedback/voice` | POST | Upload audio recording — transcribe, parse ad numbers, route feedback |
 | `/api/feedback/style-notes` | GET | Get all style notes files for display |
 | `/api/variants` | GET | List all variants (optional `?status=` filter) |
 | `/api/performance` | GET | Portfolio-level performance summary |
@@ -327,8 +400,8 @@ These values are injected into the generation prompt. The feedback processor can
 
 | Variable | Required For | Description |
 |----------|-------------|-------------|
-| `ANTHROPIC_API_KEY` | Intake, copy gen, HTML/CSS strategy | Claude API key |
-| `OPENAI_API_KEY` | DALL-E strategy | OpenAI API key |
+| `ANTHROPIC_API_KEY` | Intake, copy gen, HTML/CSS strategy, feedback | Claude API key |
+| `OPENAI_API_KEY` | DALL-E strategy, voice feedback (Whisper) | OpenAI API key |
 | `GOOGLE_GEMINI_API_KEY` | Imagen strategy | Google Gemini API key |
 | `META_ACCESS_TOKEN` | Deploy, Track (future) | Meta Marketing API |
 | `SLACK_WEBHOOK_URL` | Notifications (future) | Slack incoming webhook |
@@ -352,7 +425,8 @@ rm -rf data/creatives/*/
 ### Adding a New Image Generation Strategy
 
 1. Create a class in `engine/generation/strategies.py` that extends `ImageStrategy`
-2. Implement `generate_image(brief, copy_data, index, assets_dir) -> str`
+2. Implement `generate_image(brief, copy_data, index, assets_dir, aspect_ratio) -> str`
 3. Implement `is_available() -> bool`
 4. Register it in `STRATEGY_REGISTRY` at the bottom of the file
 5. Add a menu entry in `prompt_visual_style()` in `generator.py`
+6. Add a row to `VISUAL_STYLE_TO_TYPE` in `feedback.py` and `VISUAL_STYLE_STRATEGY_MAP` in `strategies.py`

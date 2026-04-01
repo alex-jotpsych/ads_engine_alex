@@ -6,6 +6,7 @@ anthropic>=0.40.0
 # API
 fastapi>=0.110.0
 uvicorn>=0.27.0
+python-multipart
 
 # Data / Regression
 numpy>=1.26.0
@@ -17,6 +18,9 @@ scipy>=1.12.0
 
 # Google Ads (intern: uncomment when implementing)
 # google-ads>=24.0.0
+
+# HTML/CSS screenshot rendering
+playwright>=1.40.0
 
 # Image generation (intern: add based on chosen provider)
 # replicate  # for Flux

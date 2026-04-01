@@ -104,6 +104,7 @@ class CreativeTaxonomy(BaseModel):
     format: AdFormat
     platform: Platform
     placement: str             # feed | story | reels | search | display | discover
+    aspect_ratio: str = "1:1"  # 1:1 | 4:5 | 9:16
 
     # COPY SPECIFICS — granular text features
     headline_word_count: int

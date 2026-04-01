@@ -57,9 +57,30 @@ class Orchestrator:
     # On-demand: Idea → Variants
     # ------------------------------------------------------------------
 
-    def submit_idea(self, raw_text: str, source: str = "manual") -> dict:
-        """Full pipeline: parse idea → generate variants → notify."""
+    def submit_idea(
+        self,
+        raw_text: str,
+        source: str = "manual",
+        num_variants: int | None = None,
+        formats: list[str] | None = None,
+        platforms: list[str] | None = None,
+    ) -> dict:
+        """Full pipeline: parse idea → generate variants → notify.
+
+        num_variants, formats, platforms override whatever the parser infers
+        from the idea text when provided.
+        """
+        from engine.models import AdFormat, Platform
+
         brief = self.parser.parse(raw_text, source)
+
+        if num_variants is not None:
+            brief.num_variants = num_variants
+        if formats is not None:
+            brief.formats_requested = [AdFormat(f) for f in formats]
+        if platforms is not None:
+            brief.platforms = [Platform(p) for p in platforms]
+
         self.store.save_brief(brief)
 
         variants = self.generator.generate(brief)
@@ -188,20 +209,52 @@ if __name__ == "__main__":
             print(result)
 
         elif command == "idea":
-            if len(sys.argv) < 3:
-                print("Usage: python -m engine.orchestrator idea 'your idea here'")
-                sys.exit(1)
-            idea = " ".join(sys.argv[2:])
+            import argparse
+            parser = argparse.ArgumentParser(prog="orchestrator idea")
+            parser.add_argument("idea_words", nargs="+", help="The ad concept")
+            parser.add_argument("--variants", type=int, default=None,
+                                help="Number of copy variants to generate (default: 6)")
+            parser.add_argument("--formats", nargs="+", default=None,
+                                choices=["single_image", "video"],
+                                help="Asset formats to generate (default: single_image)")
+            parser.add_argument("--platforms", nargs="+", default=None,
+                                choices=["meta", "google"],
+                                help="Target platforms (default: meta google)")
+            parser.add_argument("--aspect-ratio", default=None,
+                                choices=["1:1", "4:5", "9:16"],
+                                help="Aspect ratio: 1:1 (feed), 4:5 (portrait), 9:16 (stories)")
+            args = parser.parse_args(sys.argv[2:])
 
-            # Interactive visual style selection
-            from engine.generation.generator import prompt_visual_style
+            idea = " ".join(args.idea_words)
+
+            # Interactive visual style selection (always prompted — no CLI flag)
+            from engine.generation.generator import (
+                prompt_visual_style, prompt_aspect_ratio,
+                prompt_num_variants, prompt_formats,
+            )
             visual_style, strategy_name = prompt_visual_style()
             orchestrator.generator.visual_style = visual_style
             orchestrator.generator.set_strategy(strategy_name)
 
-            result = orchestrator.submit_idea(idea)
+            # Aspect ratio — CLI flag or interactive prompt
+            aspect_ratio = args.aspect_ratio or prompt_aspect_ratio()
+            orchestrator.generator.aspect_ratio = aspect_ratio
+
+            # Number of variants — CLI flag or interactive prompt
+            num_variants = args.variants if args.variants is not None else prompt_num_variants()
+
+            # Formats — CLI flag or interactive prompt
+            formats = args.formats if args.formats is not None else prompt_formats()
+
+            result = orchestrator.submit_idea(
+                idea,
+                num_variants=num_variants,
+                formats=formats,
+                platforms=args.platforms,
+            )
             print(f"Brief: {result['brief_id']}")
             print(f"Variants generated: {result['variants_generated']}")
+            print(f"Aspect ratio: {aspect_ratio}")
 
         elif command == "review":
             pending = orchestrator.reviewer.get_pending_review()

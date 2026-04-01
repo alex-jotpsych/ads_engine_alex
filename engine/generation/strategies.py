@@ -30,12 +30,22 @@ from anthropic import Anthropic
 STYLE_REFS_DIR = Path("data/style_references")
 BRAND_DIR = STYLE_REFS_DIR / "brand"
 
+# Dimensions and API params for each supported aspect ratio
+ASPECT_RATIO_DIMS = {
+    "1:1":  {"width": 1080, "height": 1080, "imagen": "1:1",  "dalle": "1024x1024"},
+    "4:5":  {"width": 1080, "height": 1350, "imagen": "4:5",  "dalle": "1024x1024"},
+    "9:16": {"width": 1080, "height": 1920, "imagen": "9:16", "dalle": "1024x1792"},
+}
 
-def load_style_notes(strategy_type: str = "global") -> str:
-    """Load global + strategy-specific style notes for injection into prompts.
+RATIO_SLUG = {"1:1": "1x1", "4:5": "4x5", "9:16": "9x16"}
+
+
+def load_style_notes(strategy_type: str = "global", aspect_ratio: str = "1:1") -> str:
+    """Load global + strategy×aspect-ratio-specific style notes for injection into prompts.
 
     Args:
-        strategy_type: "photo" for Imagen/DALL-E, "graphic" for HTML/CSS, "global" for global-only.
+        strategy_type: "photo", "illustration", "graphic", or "global".
+        aspect_ratio: "1:1", "4:5", or "9:16".
 
     Returns:
         Combined style notes string, or empty string if no meaningful notes exist.
@@ -49,9 +59,10 @@ def load_style_notes(strategy_type: str = "global") -> str:
         if content and "(no notes yet)" not in content:
             parts.append(content)
 
-    # Load strategy-specific notes
+    # Load strategy×ratio-specific notes (e.g. style_notes_graphic_9x16.md)
     if strategy_type in ("photo", "illustration", "graphic"):
-        specific_path = STYLE_REFS_DIR / f"style_notes_{strategy_type}.md"
+        slug = RATIO_SLUG.get(aspect_ratio, "1x1")
+        specific_path = STYLE_REFS_DIR / f"style_notes_{strategy_type}_{slug}.md"
         if specific_path.exists():
             content = specific_path.read_text().strip()
             if content and "(no notes yet)" not in content:
@@ -129,41 +140,11 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
-IMAGEN_ILLUSTRATION_PROMPT = """Generate a single cohesive illustration for a Meta (Facebook/Instagram) feed ad.
+IMAGEN_ILLUSTRATION_PROMPT = """A warm editorial illustration in flat semi-flat style for a square social media ad. Mood drawn from: "{headline}". Subject: {subject_matter}. Visual direction: {visual_direction}.
 
-Context (for mood only — do NOT illustrate the headline literally):
-Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
-Mood reference: "{headline}"
-Visual direction: {visual_direction}
-Color mood: {color_mood}
-Subject: {subject_matter}
+Style similar to Headspace, Calm, or Notion marketing art — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center by the rule of thirds, with open negative space in the top or bottom third for text overlay. Warm, approachable, calming mood appropriate for behavioral health therapists.
 
-THIS IS A STYLIZED ILLUSTRATION — NOT a photograph, NOT photorealistic, NOT 3D rendered. It should look hand-drawn, editorial, or digitally illustrated.
-
-ILLUSTRATION STYLE:
-- Modern editorial illustration style — think New Yorker covers, Headspace app, Calm app, or Slack marketing illustrations
-- Flat or semi-flat design with subtle texture (grain, paper texture, soft brush strokes)
-- Limited color palette: 3-5 colors maximum. Use deep navy-indigo, soft blush pink, vibrant pink, warm yellow, and electric purple tones. Keep it warm and approachable.
-- Soft, rounded shapes — organic forms, not sharp geometric
-- If a person is present: simplified, stylized human figure (not realistic proportions). Expressive pose, minimal facial detail. Think Notion or Linear-style character art.
-- Warm, approachable, calming mood — this is for therapists, not corporate execs
-
-COMPOSITION:
-- ONE single focal point — one character or one central visual metaphor
-- Leave clear negative space for text overlay (top third or bottom third)
-- Square format (1:1 aspect ratio) for Meta feed
-- Subject placed using rule of thirds, not centered
-- Simple, uncluttered background — solid color or soft gradient
-
-ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
-- Any text, words, letters, logos, watermarks, or UI elements
-- Photorealistic rendering, 3D renders, or AI-generated "uncanny valley" faces
-- Before/after comparisons, split screens, collages, or side-by-side compositions
-- Multiple panels, frames, borders, or divided sections
-- Clip art or generic stock illustration style
-- Overly complex scenes with many characters or objects
-- Dark, moody, or corporate aesthetics
-- Lens flare, shadows, or photographic lighting effects
+No text, letters, words, labels, logos, watermarks, or UI elements anywhere in the image. No photorealistic rendering, no 3D, no photography. No split screens, multiple panels, borders, or frames. No clip art. No dark or corporate aesthetics. No photographic lighting, lens flare, or shadows.
 """
 
 
@@ -187,7 +168,8 @@ class ImagenStrategy(ImageStrategy):
     def is_available(self) -> bool:
         return bool(os.getenv("GOOGLE_GEMINI_API_KEY"))
 
-    def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path) -> str:
+    def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path,
+                       aspect_ratio: str = "1:1") -> str:
         taxonomy = copy_data["taxonomy"]
         visual_style = taxonomy.get("visual_style", "photography")
 
@@ -204,18 +186,19 @@ class ImagenStrategy(ImageStrategy):
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
 
-        # Inject style feedback specific to the visual style
+        # Inject style feedback specific to visual style × aspect ratio
         notes_type = "illustration" if visual_style == "illustration" else "photo"
-        style_notes = load_style_notes(notes_type)
+        style_notes = load_style_notes(notes_type, aspect_ratio)
         if style_notes:
             prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
 
+        dims = ASPECT_RATIO_DIMS.get(aspect_ratio, ASPECT_RATIO_DIMS["1:1"])
         response = self.client.models.generate_images(
             model="imagen-4.0-generate-001",
             prompt=prompt,
             config={
                 "number_of_images": 1,
-                "aspect_ratio": "1:1",
+                "aspect_ratio": dims["imagen"],
                 "person_generation": "allow_adult",
             },
         )
@@ -224,7 +207,7 @@ class ImagenStrategy(ImageStrategy):
         file_path = assets_dir / f"variant_{index}.png"
         file_path.write_bytes(image.image.image_bytes)
 
-        print(f"  [IMAGEN] Generated {file_path}")
+        print(f"  [IMAGEN] Generated {file_path} ({aspect_ratio})")
         return str(file_path)
 
 
@@ -270,41 +253,11 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
-DALLE_ILLUSTRATION_PROMPT = """Generate a single cohesive illustration for a Meta (Facebook/Instagram) feed ad.
+DALLE_ILLUSTRATION_PROMPT = """A warm editorial illustration in flat semi-flat style for a square social media ad. Mood drawn from: "{headline}". Subject: {subject_matter}. Visual direction: {visual_direction}.
 
-Context (for mood only — do NOT illustrate the headline literally):
-Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
-Mood reference: "{headline}"
-Visual direction: {visual_direction}
-Color mood: {color_mood}
-Subject: {subject_matter}
+Style similar to Headspace, Calm, or Notion marketing art — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center by the rule of thirds, with open negative space in the top or bottom third for text overlay. Warm, approachable, calming mood appropriate for behavioral health therapists.
 
-THIS IS A STYLIZED ILLUSTRATION — NOT a photograph, NOT photorealistic, NOT 3D rendered. It should look hand-drawn, editorial, or digitally illustrated.
-
-ILLUSTRATION STYLE:
-- Modern editorial illustration style — think New Yorker covers, Headspace app, Calm app, or Slack marketing illustrations
-- Flat or semi-flat design with subtle texture (grain, paper texture, soft brush strokes)
-- Limited color palette: 3-5 colors maximum. Use deep navy-indigo, soft blush pink, vibrant pink, warm yellow, and electric purple tones. Keep it warm and approachable.
-- Soft, rounded shapes — organic forms, not sharp geometric
-- If a person is present: simplified, stylized human figure (not realistic proportions). Expressive pose, minimal facial detail. Think Notion or Linear-style character art.
-- Warm, approachable, calming mood — this is for therapists, not corporate execs
-
-COMPOSITION:
-- ONE single focal point — one character or one central visual metaphor
-- Leave clear negative space for text overlay (top third or bottom third)
-- Square format (1:1 aspect ratio) for Meta feed
-- Subject placed using rule of thirds, not centered
-- Simple, uncluttered background — solid color or soft gradient
-
-ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
-- Any text, words, letters, logos, watermarks, or UI elements
-- Photorealistic rendering, 3D renders, or AI-generated "uncanny valley" faces
-- Before/after comparisons, split screens, collages, or side-by-side compositions
-- Multiple panels, frames, borders, or divided sections
-- Clip art or generic stock illustration style
-- Overly complex scenes with many characters or objects
-- Dark, moody, or corporate aesthetics
-- Lens flare, shadows, or photographic lighting effects
+No text, letters, words, labels, logos, watermarks, or UI elements anywhere in the image. No photorealistic rendering, no 3D, no photography. No split screens, multiple panels, borders, or frames. No clip art. No dark or corporate aesthetics. No photographic lighting, lens flare, or shadows.
 """
 
 
@@ -327,7 +280,8 @@ class DalleStrategy(ImageStrategy):
     def is_available(self) -> bool:
         return bool(os.getenv("OPENAI_API_KEY"))
 
-    def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path) -> str:
+    def generate_image(self, brief, copy_data: dict, index: int, assets_dir: Path,
+                       aspect_ratio: str = "1:1") -> str:
         taxonomy = copy_data["taxonomy"]
         visual_style = taxonomy.get("visual_style", "photography")
 
@@ -343,17 +297,18 @@ class DalleStrategy(ImageStrategy):
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
         )
 
-        # Inject style feedback specific to the visual style
+        # Inject style feedback specific to visual style × aspect ratio
         notes_type = "illustration" if visual_style == "illustration" else "photo"
-        style_notes = load_style_notes(notes_type)
+        style_notes = load_style_notes(notes_type, aspect_ratio)
         if style_notes:
             prompt += f"\n\nREVIEWER STYLE GUIDANCE (follow these preferences):\n{style_notes}\n"
 
+        dims = ASPECT_RATIO_DIMS.get(aspect_ratio, ASPECT_RATIO_DIMS["1:1"])
         response = self.client.images.generate(
             model="dall-e-3",
             prompt=prompt,
             n=1,
-            size="1024x1024",
+            size=dims["dalle"],
             quality="standard",
             response_format="b64_json",
         )
@@ -362,7 +317,7 @@ class DalleStrategy(ImageStrategy):
         file_path = assets_dir / f"variant_{index}.png"
         file_path.write_bytes(image_data)
 
-        print(f"  [DALLE] Generated {file_path}")
+        print(f"  [DALLE] Generated {file_path} ({aspect_ratio})")
         return str(file_path)
 
 
@@ -380,26 +335,33 @@ def load_brand_config() -> dict:
     return {}
 
 
-def build_html_system_prompt() -> str:
+def build_html_system_prompt(aspect_ratio: str = "1:1") -> str:
     """Build the HTML system prompt with current brand_config values injected."""
     cfg = load_brand_config()
     logo = cfg.get("logo", {})
-    typo = cfg.get("typography", {})
     layout = cfg.get("layout", {})
+
+    # Typography: per-ratio if available, fallback to flat structure for backwards compat
+    typo_by_ratio = cfg.get("typography_by_ratio", {})
+    typo = typo_by_ratio.get(aspect_ratio, cfg.get("typography", {}))
 
     logo_width = logo.get("width_px", 160)
     logo_top = logo.get("top_px", 40)
     logo_left = logo.get("left_px", 40)
-    hl_size = typo.get("headline_size_range", [52, 72])
+    hl_size = typo.get("headline_size_range", [58, 72])
     hl_weight = typo.get("headline_weight_range", [600, 800])
     body_size = typo.get("body_size_range", [22, 28])
     body_weight = typo.get("body_weight_range", [400, 500])
     cta_size = typo.get("cta_size_range", [20, 24])
     pad = layout.get("padding_min_px", 80)
 
-    return f"""You are a senior digital ad designer at a top agency. You create Meta (Facebook/Instagram) feed ad images using pure HTML and CSS.
+    dims = ASPECT_RATIO_DIMS.get(aspect_ratio, ASPECT_RATIO_DIMS["1:1"])
+    canvas_w = dims["width"]
+    canvas_h = dims["height"]
 
-Generate a single self-contained HTML file that renders as a 1080x1080px ad creative.
+    return f"""You are a senior digital ad designer at a top agency. You create Meta (Facebook/Instagram) ad images using pure HTML and CSS.
+
+Generate a single self-contained HTML file that renders as a {canvas_w}x{canvas_h}px ad creative.
 
 ## BRAND STYLE GUIDE — JotPsych
 
@@ -452,13 +414,14 @@ Place it in the TOP-LEFT corner of the ad. Style it with CSS only:
 - Do NOT attempt to write SVG paths or recreate the logo — just place the empty div with the class name
 
 ### Layout Rules
-- Root container: exactly 1080px × 1080px, overflow hidden
+- Root container: exactly {canvas_w}px × {canvas_h}px, overflow hidden
 - Use CSS flexbox for ALL centering and alignment — never use absolute positioning for text
 - Padding: minimum {pad}px on all sides (content must not touch edges)
 - Headline in the top 40% of the ad
 - CTA button in the bottom 30%, horizontally centered
 - Description text between headline and CTA
 - Maximum 3 visual elements total (background + headline + CTA). Simplicity wins.
+- MINIMUM font sizes: body text never below 22px, headlines never below 52px
 
 ### CTA Button Style
 - Pill shape: border-radius 50px, padding 18px 48px
@@ -481,13 +444,13 @@ Place it in the TOP-LEFT corner of the ad. Style it with CSS only:
 - Completely self-contained (all CSS inline in a <style> tag, no external resources)
 - Do NOT write any @font-face, @import, or <link> tags for fonts — they are injected automatically. Just use font-family: 'Archivo' and 'Inter' in your CSS.
 - Do NOT write any <svg> tags or SVG path data — the logo is injected automatically into the .jotpsych-logo div
-- Root element must be exactly 1080px × 1080px
+- Root element must be exactly {canvas_w}px × {canvas_h}px
 - Use the provided headline and CTA text EXACTLY as given — do not rewrite copy
 - Every text element must be perfectly centered horizontally
 - Test your layout mentally: would a designer at Pentagram approve this? If not, simplify.
 """
 
-HTML_USER_PROMPT = """Create a 1080x1080px Meta feed ad.
+HTML_USER_PROMPT = """Create a {canvas_w}x{canvas_h}px Meta ad.
 
 Headline: {headline}
 Description: {description}
@@ -502,6 +465,7 @@ Remember:
 - Do NOT write any SVG code — just the empty div with the class
 - Pick ONE color palette from the brand guide based on the color mood
 - Use flexbox centering, keep it minimal
+- Canvas is {canvas_w}×{canvas_h}px — do NOT hardcode 1080×1080 if the dimensions differ
 """
 
 CRITIQUE_PROMPT = """You are a senior art director reviewing a rendered ad image. The ad was generated as HTML/CSS and screenshotted.
@@ -614,12 +578,12 @@ class HtmlCssStrategy(ImageStrategy):
 
         return html
 
-    def _load_style_context(self) -> str:
+    def _load_style_context(self, aspect_ratio: str = "1:1") -> str:
         """Load style references to inject into the generation prompt."""
         parts = []
 
-        # Load global + graphic-specific style notes
-        style_notes = load_style_notes("graphic")
+        # Load global + graphic-specific style notes (aspect-ratio aware)
+        style_notes = load_style_notes("graphic", aspect_ratio)
         if style_notes:
             parts.append(f"## Reviewer Feedback on Style\n\n{style_notes}")
 
@@ -668,8 +632,10 @@ class HtmlCssStrategy(ImageStrategy):
     def generate_image(
         self, brief, copy_data: dict, index: int, assets_dir: Path,
         critique: bool = True,
+        aspect_ratio: str = "1:1",
     ) -> str:
         taxonomy = copy_data["taxonomy"]
+        dims = ASPECT_RATIO_DIMS.get(aspect_ratio, ASPECT_RATIO_DIMS["1:1"])
 
         user_prompt = HTML_USER_PROMPT.format(
             headline=copy_data["headline"],
@@ -677,11 +643,13 @@ class HtmlCssStrategy(ImageStrategy):
             cta_button=copy_data.get("cta_button", "Learn More"),
             color_mood=taxonomy.get("color_mood", "brand_primary"),
             tone=taxonomy.get("tone", "warm"),
+            canvas_w=dims["width"],
+            canvas_h=dims["height"],
         )
 
         # Inject style references into the system prompt
-        style_context = self._load_style_context()
-        system = build_html_system_prompt()
+        style_context = self._load_style_context(aspect_ratio)
+        system = build_html_system_prompt(aspect_ratio)
         if style_context:
             system += f"\n\n---\n\n# STYLE REFERENCES (learn from these)\n\n{style_context}"
 
@@ -700,13 +668,13 @@ class HtmlCssStrategy(ImageStrategy):
             html_path = assets_dir / f"variant_{index}.html"
             html_path.write_text(html_content)
             file_path = assets_dir / f"variant_{index}.png"
-            self._screenshot(self._inject_brand(html_content), file_path)
+            self._screenshot(self._inject_brand(html_content), file_path, aspect_ratio)
             print(f"  [HTML] Generated {file_path} (single-pass)")
             return str(file_path)
 
         # Screenshot the first pass (inject fonts only for Playwright, not for Claude)
         draft_path = assets_dir / f"variant_{index}_draft.png"
-        self._screenshot(self._inject_brand(html_content), draft_path)
+        self._screenshot(self._inject_brand(html_content), draft_path, aspect_ratio)
         print(f"  [HTML] Draft {index} rendered, running critique...")
 
         # --- Pass 2: Critique the screenshot and fix ---
@@ -760,7 +728,7 @@ class HtmlCssStrategy(ImageStrategy):
 
         # Screenshot the fixed version (inject fonts only for Playwright rendering)
         file_path = assets_dir / f"variant_{index}.png"
-        self._screenshot(self._inject_brand(fixed_html), file_path)
+        self._screenshot(self._inject_brand(fixed_html), file_path, aspect_ratio)
 
         # Clean up draft
         draft_path.unlink(missing_ok=True)
@@ -789,9 +757,10 @@ class HtmlCssStrategy(ImageStrategy):
             cls._browser = cls._playwright.chromium.launch()
         return cls._browser
 
-    def _screenshot(self, html: str, output_path: Path) -> None:
+    def _screenshot(self, html: str, output_path: Path, aspect_ratio: str = "1:1") -> None:
+        dims = ASPECT_RATIO_DIMS.get(aspect_ratio, ASPECT_RATIO_DIMS["1:1"])
         browser = self._get_browser()
-        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page = browser.new_page(viewport={"width": dims["width"], "height": dims["height"]})
         page.set_content(html, wait_until="load")
         # Wait for @font-face fonts to fully load before screenshotting
         page.evaluate("() => document.fonts.ready")

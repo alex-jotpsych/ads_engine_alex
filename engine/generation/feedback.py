@@ -42,15 +42,18 @@ VISUAL_STYLE_TO_LIKED_DIR = {
     "screen_capture": "liked_graphic",
 }
 
-# Maps visual_style taxonomy values to their style notes file
-VISUAL_STYLE_TO_NOTES_FILE = {
-    "photography": "style_notes_photo.md",
-    "illustration": "style_notes_illustration.md",
-    "mixed_media": "style_notes_photo.md",
-    "text_heavy": "style_notes_graphic.md",
-    "abstract": "style_notes_graphic.md",
-    "screen_capture": "style_notes_graphic.md",
+# Maps visual_style to a style note type (first dimension of 2D routing)
+VISUAL_STYLE_TO_TYPE = {
+    "photography": "photo",
+    "illustration": "illustration",
+    "mixed_media": "photo",
+    "text_heavy": "graphic",
+    "abstract": "graphic",
+    "screen_capture": "graphic",
 }
+
+# Maps aspect_ratio to filename slug (second dimension of 2D routing)
+RATIO_SLUG = {"1:1": "1x1", "4:5": "4x5", "9:16": "9x16"}
 
 FEEDBACK_SYSTEM_PROMPT = """You are a creative director maintaining a style guide for AI-generated ad images.
 
@@ -130,6 +133,7 @@ class FeedbackProcessor:
         feedback: str,
         variant_id: str | None = None,
         visual_style: str | None = None,
+        aspect_ratio: str | None = None,
         strategy_name: str | None = None,
         taxonomy: dict | None = None,
         asset_path: str | None = None,
@@ -153,8 +157,8 @@ class FeedbackProcessor:
         Returns:
             Dict with updated_notes content and which file was updated
         """
-        # Determine which file to update based on visual_style
-        notes_file = self._resolve_notes_file(visual_style)
+        # Determine which file to update based on visual_style × aspect_ratio
+        notes_file = self._resolve_notes_file(visual_style, aspect_ratio)
         notes_path = STYLE_REFS_DIR / notes_file
 
         # Read current notes from the target file
@@ -203,6 +207,7 @@ class FeedbackProcessor:
     def process_like(
         self,
         visual_style: str | None = None,
+        aspect_ratio: str | None = None,
         asset_path: str | None = None,
         note: str | None = None,
         taxonomy: dict | None = None,
@@ -230,7 +235,7 @@ class FeedbackProcessor:
         liked_dir = STYLE_REFS_DIR / liked_dir_name
         liked_dir.mkdir(parents=True, exist_ok=True)
 
-        notes_file = self._resolve_notes_file(visual_style)
+        notes_file = self._resolve_notes_file(visual_style, aspect_ratio)
         notes_path = STYLE_REFS_DIR / notes_file
 
         reference_path = None
@@ -337,11 +342,13 @@ class FeedbackProcessor:
             text_prompt,
         )
 
-    def _resolve_notes_file(self, visual_style: str | None) -> str:
-        """Determine which style notes file to update based on visual_style."""
-        if visual_style and visual_style in VISUAL_STYLE_TO_NOTES_FILE:
-            return VISUAL_STYLE_TO_NOTES_FILE[visual_style]
-        return "style_notes_global.md"
+    def _resolve_notes_file(self, visual_style: str | None, aspect_ratio: str | None = None) -> str:
+        """Determine which style notes file to update based on visual_style × aspect_ratio."""
+        style_type = VISUAL_STYLE_TO_TYPE.get(visual_style or "", None)
+        if not style_type:
+            return "style_notes_global.md"
+        slug = RATIO_SLUG.get(aspect_ratio or "1:1", "1x1")
+        return f"style_notes_{style_type}_{slug}.md"
 
     def _read_notes(self, path: Path) -> str:
         """Read a style notes file, returning default content if missing."""
@@ -480,8 +487,12 @@ If no changes are needed, respond with exactly: NO_CHANGES""",
     def get_all_notes(self) -> dict:
         """Return all style notes files for display in UI."""
         result = {}
-        for filename in ("style_notes_global.md", "style_notes_photo.md", "style_notes_illustration.md", "style_notes_graphic.md"):
-            path = STYLE_REFS_DIR / filename
-            label = filename.replace("style_notes_", "").replace(".md", "")
-            result[label] = self._read_notes(path)
+        # Global notes (applies to all)
+        result["global"] = self._read_notes(STYLE_REFS_DIR / "style_notes_global.md")
+        # Per-type × per-ratio notes
+        for style_type in ("photo", "illustration", "graphic"):
+            for _, slug in RATIO_SLUG.items():
+                filename = f"style_notes_{style_type}_{slug}.md"
+                label = f"{style_type}_{slug}"
+                result[label] = self._read_notes(STYLE_REFS_DIR / filename)
         return result

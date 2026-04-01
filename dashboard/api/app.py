@@ -21,7 +21,7 @@ load_dotenv()
 from datetime import date
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -74,11 +74,13 @@ class ReviewAction(BaseModel):
 class ImageFeedback(BaseModel):
     variant_id: Optional[str] = None
     feedback: str
+    aspect_ratio: Optional[str] = None
 
 
 class ImageLike(BaseModel):
     variant_id: str
     note: Optional[str] = None
+    aspect_ratio: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +172,7 @@ async def submit_image_feedback(fb: ImageFeedback):
     visual_style. All future generations of that type pick up the changes.
     """
     visual_style = None
+    aspect_ratio = fb.aspect_ratio
     strategy_name = None
     taxonomy = None
     asset_path = None
@@ -181,6 +184,8 @@ async def submit_image_feedback(fb: ImageFeedback):
             taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
             if taxonomy:
                 visual_style = taxonomy.get("visual_style")
+                if aspect_ratio is None:
+                    aspect_ratio = taxonomy.get("aspect_ratio", "1:1")
                 from engine.generation.strategies import VISUAL_STYLE_STRATEGY_MAP
                 strategy_name = VISUAL_STYLE_STRATEGY_MAP.get(visual_style or "", None)
         except (FileNotFoundError, Exception):
@@ -190,6 +195,7 @@ async def submit_image_feedback(fb: ImageFeedback):
         feedback=fb.feedback,
         variant_id=fb.variant_id,
         visual_style=visual_style,
+        aspect_ratio=aspect_ratio,
         strategy_name=strategy_name,
         taxonomy=taxonomy,
         asset_path=asset_path,
@@ -214,6 +220,7 @@ async def like_image(like: ImageLike):
     what makes this image good.
     """
     visual_style = None
+    aspect_ratio = like.aspect_ratio
     asset_path = None
     taxonomy = None
 
@@ -223,11 +230,14 @@ async def like_image(like: ImageLike):
         taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
         if taxonomy:
             visual_style = taxonomy.get("visual_style")
+            if aspect_ratio is None:
+                aspect_ratio = taxonomy.get("aspect_ratio", "1:1")
     except (FileNotFoundError, Exception):
         pass
 
     result = feedback_processor.process_like(
         visual_style=visual_style,
+        aspect_ratio=aspect_ratio,
         asset_path=asset_path,
         note=like.note,
         taxonomy=taxonomy,
@@ -246,6 +256,117 @@ async def like_image(like: ImageLike):
 async def get_style_notes():
     """Get all style notes files for display in the feedback UI."""
     return feedback_processor.get_all_notes()
+
+
+@app.post("/api/feedback/voice")
+async def submit_voice_feedback(
+    audio: UploadFile = File(...),
+    display_map: str = Form(...),
+):
+    """Process a voice recording containing feedback on numbered ads.
+
+    The audio is transcribed with Whisper, then Claude parses the transcript
+    to extract (ad_number, feedback_text) pairs. Each pair is routed to the
+    correct style notes file via the variant's visual_style × aspect_ratio.
+
+    Form fields:
+    - audio: audio file (.m4a, .mp3, .wav)
+    - display_map: JSON string mapping display number → variant UUID
+                   e.g. {"1": "uuid-abc", "2": "uuid-def"}
+    """
+    import json
+    import tempfile
+    import os
+    from openai import OpenAI
+    from anthropic import Anthropic
+
+    # Parse display_map
+    try:
+        num_to_uuid: dict[str, str] = json.loads(display_map)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="display_map must be valid JSON")
+
+    # Save audio to a temp file and transcribe with Whisper
+    audio_bytes = await audio.read()
+    suffix = os.path.splitext(audio.filename or "audio.m4a")[1] or ".m4a"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(audio_bytes)
+        tmp_path = tmp.name
+
+    try:
+        oai = OpenAI()
+        with open(tmp_path, "rb") as f:
+            transcription = oai.audio.transcriptions.create(model="whisper-1", file=f)
+        transcript = transcription.text
+    finally:
+        os.unlink(tmp_path)
+
+    # Ask Claude to extract (ad_number, feedback) pairs from the transcript
+    claude = Anthropic()
+    parse_response = claude.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1000,
+        system=(
+            "Extract all (ad_number, feedback_text) pairs from the transcript. "
+            "The speaker references ads by number (e.g. 'Ad 2', '#3', 'the third one'). "
+            "Return a JSON array only, no explanation: "
+            '[{"ad_number": <int>, "feedback": "<feedback text>"}]'
+        ),
+        messages=[{"role": "user", "content": transcript}],
+    )
+
+    try:
+        pairs_text = parse_response.content[0].text.strip()
+        if pairs_text.startswith("```"):
+            pairs_text = pairs_text.split("```")[1].split("```")[0].strip()
+            if pairs_text.startswith("json"):
+                pairs_text = pairs_text[4:].strip()
+        pairs: list[dict] = json.loads(pairs_text)
+    except (json.JSONDecodeError, Exception):
+        pairs = []
+
+    # Route each feedback to the correct style notes file
+    processed = []
+    for pair in pairs:
+        ad_num = str(pair.get("ad_number", ""))
+        feedback_text = pair.get("feedback", "").strip()
+        if not feedback_text or ad_num not in num_to_uuid:
+            continue
+
+        variant_id = num_to_uuid[ad_num]
+        visual_style = None
+        aspect_ratio = None
+        asset_path = None
+        taxonomy = None
+
+        try:
+            variant = store.get_variant(variant_id)
+            asset_path = variant.asset_path
+            taxonomy = variant.taxonomy.model_dump() if variant.taxonomy else None
+            if taxonomy:
+                visual_style = taxonomy.get("visual_style")
+                aspect_ratio = taxonomy.get("aspect_ratio", "1:1")
+        except (FileNotFoundError, Exception):
+            pass
+
+        result = feedback_processor.process_feedback(
+            feedback=feedback_text,
+            variant_id=variant_id,
+            visual_style=visual_style,
+            aspect_ratio=aspect_ratio,
+            taxonomy=taxonomy,
+            asset_path=asset_path,
+        )
+        processed.append({
+            "ad_number": int(ad_num),
+            "variant_id": variant_id,
+            "notes_file": result["notes_file"],
+        })
+
+    return {
+        "transcript": transcript,
+        "feedback_processed": processed,
+    }
 
 
 # ---------------------------------------------------------------------------
