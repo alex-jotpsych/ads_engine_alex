@@ -145,7 +145,28 @@ class MetaDeployer:
                 "link_data": link_data,
             },
         }
-        creative = self.account.create_ad_creative(creative_params)
+        try:
+            creative = self.account.create_ad_creative(creative_params)
+        except Exception as sdk_err:
+            # Re-raise with raw HTTP fallback for better error detail
+            import requests as _req, json as _json
+            raw = _req.post(
+                f"https://graph.facebook.com/v21.0/{self.ad_account_id}/adcreatives",
+                data={
+                    "name": creative_params[AdCreative.Field.name],
+                    "object_story_spec": _json.dumps(
+                        creative_params[AdCreative.Field.object_story_spec]
+                    ),
+                    "access_token": self.access_token,
+                },
+                timeout=30,
+            )
+            raw_err = raw.json().get("error", {})
+            user_msg = raw_err.get("error_user_msg") or raw_err.get("message") or str(sdk_err)
+            raise RuntimeError(
+                f"AdCreative creation failed — {user_msg} "
+                f"(code {raw_err.get('code')}, subcode {raw_err.get('error_subcode')})"
+            ) from None
 
         # 3. Create Ad
         ad_params = {
