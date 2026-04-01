@@ -328,7 +328,23 @@
             display: none; position: fixed; bottom: 24px; right: 24px;
             background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;
             padding: 10px 18px; border-radius: 7px; font-size: 13px; z-index: 300;
-            animation: fadeIn 0.18s ease;
+            animation: fadeIn 0.18s ease; max-width: 480px;
+        }
+        .feedback-toast.error {
+            background: #fef2f2; border-color: #fca5a5; color: #991b1b;
+            padding: 10px 14px 10px 18px; display: flex; align-items: flex-start; gap: 12px;
+        }
+        .feedback-toast.error .toast-msg { flex: 1; white-space: pre-wrap; word-break: break-word; }
+        .feedback-toast.error .toast-dismiss {
+            flex-shrink: 0; cursor: pointer; font-size: 16px; line-height: 1;
+            color: #991b1b; opacity: 0.6; margin-top: 1px;
+        }
+        .feedback-toast.error .toast-dismiss:hover { opacity: 1; }
+        /* ---- Deploy modal inline error ---- */
+        .deploy-error {
+            display: none; background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
+            border-radius: 6px; padding: 10px 14px; font-size: 13px; margin-top: 12px;
+            white-space: pre-wrap; word-break: break-word;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -622,6 +638,8 @@
                 <input type="checkbox" id="deployConfirm" />
                 I've reviewed this creative and confirm it's ready to go live on Meta
             </label>
+
+            <div class="deploy-error" id="deployError"></div>
 
             <div class="modal-actions" style="margin-top:18px;">
                 <button class="btn-cancel" onclick="closeDeployModal()">Cancel</button>
@@ -1019,7 +1037,7 @@
                 const routingNote = data.feedback_routing === 'per_ad' ? ` (routed to ${data.per_ad_feedback?.length || 0} ads)` : '';
                 showToast(`Rejected ${data.rejected} variant(s)${routingNote}`);
                 viewMode === 'archive' ? loadArchive() : loadReviewQueue();
-            } catch (e) { showToast('Error rejecting variants'); }
+            } catch (e) { showToast(`Error rejecting variants: ${e.message}`, {type:'error'}); }
         }
 
         // ---------------------------------------------------------------
@@ -1054,7 +1072,7 @@
                 const label = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
                 showToast(`Feedback processed → ${label} updated`);
                 if (document.getElementById('styleNotesPanel').classList.contains('active')) loadStyleNotes();
-            } catch (e) { showToast('Error submitting feedback'); }
+            } catch (e) { showToast(`Error submitting feedback: ${e.message}`, {type:'error'}); }
             finally { btn.textContent = 'Submit Feedback'; btn.disabled = false; }
         }
 
@@ -1089,7 +1107,7 @@
                 const label = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
                 showToast(`Liked — saved as ${label} reference`);
                 if (document.getElementById('styleNotesPanel').classList.contains('active')) loadStyleNotes();
-            } catch (e) { showToast('Error saving liked image'); }
+            } catch (e) { showToast(`Error saving liked image: ${e.message}`, {type:'error'}); }
             finally { btn.textContent = 'Save as Reference'; btn.disabled = false; }
         }
 
@@ -1395,17 +1413,30 @@
 
         function closeDeployModal() {
             document.getElementById('deployModal').classList.remove('active');
+            clearDeployError();
             deployVariantId = null;
+        }
+
+        function showDeployError(msg) {
+            const el = document.getElementById('deployError');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        function clearDeployError() {
+            const el = document.getElementById('deployError');
+            el.style.display = 'none';
+            el.textContent = '';
         }
 
         async function submitDeploy() {
             if (!deployVariantId) return;
+            clearDeployError();
             if (!document.getElementById('deployConfirm').checked) {
-                showToast('Please confirm the creative is ready to go live');
+                showDeployError('Please confirm the creative is ready to go live.');
                 return;
             }
             const adsetId = document.getElementById('deployAdsetSelect').value;
-            if (!adsetId) { showToast('Please select an ad set'); return; }
+            if (!adsetId) { showDeployError('Please select an ad set.'); return; }
             const url = document.getElementById('deployUrl').value.trim() || null;
 
             const btn = document.getElementById('deploySubmitBtn');
@@ -1420,14 +1451,14 @@
                 });
                 if (!res.ok) {
                     const err = await res.json();
-                    throw new Error(err.detail || 'Deploy failed');
+                    throw new Error(err.detail || `HTTP ${res.status}`);
                 }
                 const data = await res.json();
                 closeDeployModal();
-                showToast(`Submitted to Meta for review — Ad ID: ${data.meta_ad_id}`);
+                showToast(`Submitted to Meta — Ad ID: ${data.meta_ad_id}`);
                 loadArchive();
             } catch (e) {
-                showToast(`Deploy error: ${e.message}`);
+                showDeployError(`Deploy failed:\n${e.message}`);
                 btn.disabled = false;
                 btn.textContent = 'Deploy';
             }
@@ -1455,11 +1486,27 @@
             return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
 
-        function showToast(msg) {
+        let _toastTimer = null;
+        function showToast(msg, opts = {}) {
             const toast = document.getElementById('feedbackToast');
-            toast.textContent = msg;
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+            const isError = opts.type === 'error';
+            if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+            toast.className = 'feedback-toast' + (isError ? ' error' : '');
+
+            if (isError) {
+                toast.innerHTML = `<span class="toast-msg">${msg}</span><span class="toast-dismiss" onclick="dismissToast()" title="Dismiss">✕</span>`;
+            } else {
+                toast.textContent = msg;
+            }
+            toast.style.display = isError ? 'flex' : 'block';
+            if (!isError) {
+                _toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3500);
+            }
+        }
+        function dismissToast() {
+            const toast = document.getElementById('feedbackToast');
+            toast.style.display = 'none';
+            toast.className = 'feedback-toast';
         }
 
         document.addEventListener('keydown', e => {

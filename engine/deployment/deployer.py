@@ -123,18 +123,26 @@ class MetaDeployer:
         image_hash = self.upload_asset(variant)
 
         # 2. Create AdCreative
+        link_data: dict = {
+            "image_hash": image_hash,
+            "link": url,
+            "message": variant.primary_text,
+            "name": variant.headline,
+            # call_to_action.value.link is required by Meta — must match link_data.link
+            "call_to_action": {
+                "type": cta_type,
+                "value": {"link": url},
+            },
+        }
+        # Description is optional — send only when non-empty (empty string fails validation)
+        if variant.description:
+            link_data["description"] = variant.description
+
         creative_params = {
             AdCreative.Field.name: variant.headline[:100],
             AdCreative.Field.object_story_spec: {
                 "page_id": self.page_id,
-                "link_data": {
-                    "image_hash": image_hash,
-                    "link": url,
-                    "message": variant.primary_text,
-                    "name": variant.headline,
-                    "description": variant.description or "",
-                    "call_to_action": {"type": cta_type},
-                },
+                "link_data": link_data,
             },
         }
         creative = self.account.create_ad_creative(creative_params)
