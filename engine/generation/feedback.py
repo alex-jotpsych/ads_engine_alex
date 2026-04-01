@@ -53,7 +53,7 @@ VISUAL_STYLE_TO_TYPE = {
 }
 
 # Maps aspect_ratio to filename slug (second dimension of 2D routing)
-RATIO_SLUG = {"1:1": "1x1", "4:5": "4x5", "9:16": "9x16"}
+RATIO_SLUG = {"1:1": "1x1", "3:4": "3x4", "9:16": "9x16"}
 
 FEEDBACK_SYSTEM_PROMPT = """You are a creative director maintaining a style guide for AI-generated ad images.
 

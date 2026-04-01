@@ -48,7 +48,7 @@ class Orchestrator:
         self.parser = IntakeParser()
         self.generator = CreativeGenerator()
         self.reviewer = ReviewPipeline(self.store)
-        self.deployer = AdDeployer(self.store)
+        self.deployer = AdDeployer.from_env(self.store)
         self.tracker = PerformanceTracker(self.store)
         self.decisions = DecisionEngine(self.store)
         self.regression = CreativeRegressionModel(self.store)
@@ -191,6 +191,15 @@ class Orchestrator:
         if decisions:
             self.notifier.notify_daily_decisions(decisions)
 
+        # 6. Poll Meta ad review statuses for LIVE variants
+        print(f"[{report_date}] Polling Meta ad review statuses...")
+        try:
+            meta_updates = self.deployer.poll_meta_ad_statuses(notifier=self.notifier)
+            results["meta_status_updates"] = len(meta_updates)
+        except Exception as e:
+            print(f"Meta status polling failed: {e}")
+            results["meta_status_updates"] = 0
+
         print(f"[{report_date}] Daily cycle complete.")
         return results
 
@@ -221,7 +230,7 @@ if __name__ == "__main__":
                                 choices=["meta", "google"],
                                 help="Target platforms (default: meta google)")
             parser.add_argument("--aspect-ratio", default=None,
-                                choices=["1:1", "4:5", "9:16"],
+                                choices=["1:1", "3:4", "9:16"],
                                 help="Aspect ratio: 1:1 (feed), 4:5 (portrait), 9:16 (stories)")
             args = parser.parse_args(sys.argv[2:])
 

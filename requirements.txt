@@ -2,6 +2,7 @@
 pydantic>=2.0
 pydantic-settings>=2.0
 anthropic>=0.40.0
+python-dotenv>=1.0.0
 
 # API
 fastapi>=0.110.0
@@ -13,8 +14,8 @@ numpy>=1.26.0
 pandas>=2.2.0
 scipy>=1.12.0
 
-# Meta Ads (intern: uncomment when implementing)
-# facebook-business>=19.0.0
+# Meta Ads
+facebook-business>=25.0.0
 
 # Google Ads (intern: uncomment when implementing)
 # google-ads>=24.0.0
@@ -32,8 +33,8 @@ google-genai # Google Imagen 3
 # runwayml
 # requests   # for API-based providers
 
-# Slack (for webhook fallback)
-# requests>=2.31.0
+# HTTP client (Slack webhook + other API calls)
+requests>=2.31.0
 
 # Dev
 pytest>=8.0.0

@@ -145,6 +145,11 @@ class AdVariant(BaseModel):
     meta_ad_id: Optional[str] = None
     google_ad_id: Optional[str] = None
 
+    # Meta review state (separate from our internal status)
+    # "pending_review" | "active" | "disapproved"
+    meta_review_status: Optional[str] = None
+    meta_rejection_reasons: Optional[list[str]] = None
+
 
 # ---------------------------------------------------------------------------
 # Performance Snapshot — daily pull from platforms

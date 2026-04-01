@@ -141,7 +141,7 @@ def prompt_aspect_ratio() -> str:
     """Interactive CLI prompt for aspect ratio selection. Returns ratio string."""
     ratios = [
         ("1:1",  "Meta feed — square (1080×1080)"),
-        ("4:5",  "Meta portrait feed (1080×1350)"),
+        ("3:4",  "Meta portrait feed (1080×1440)"),
         ("9:16", "Stories / Reels — full vertical (1080×1920)"),
     ]
     print("\n--- Aspect Ratio ---")

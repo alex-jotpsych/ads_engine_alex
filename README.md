@@ -84,7 +84,7 @@ Select visual style [1-6]:
 
 --- Aspect Ratio ---
   1. 1:1    Meta feed — square (1080×1080)
-  2. 4:5    Meta portrait feed (1080×1350)
+  2. 3:4    Meta portrait feed (1080×1440)
   3. 9:16   Stories / Reels — full vertical (1080×1920)
 
 Select aspect ratio [1-3]:
@@ -110,7 +110,7 @@ Any menu can be bypassed with a CLI flag — the interactive prompt is skipped f
 
 | Flag | Values | Effect |
 |------|--------|--------|
-| `--aspect-ratio` | `1:1`, `4:5`, `9:16` | Skip aspect ratio prompt |
+| `--aspect-ratio` | `1:1`, `3:4`, `9:16` | Skip aspect ratio prompt |
 | `--variants N` | integer | Skip variants count prompt |
 | `--formats` | `single_image` `video` | Skip format prompt |
 | `--platforms` | `meta` `google` | (no interactive prompt — defaults to `meta`) |
@@ -125,7 +125,7 @@ python -m engine.orchestrator idea "burnout among therapists"
 python -m engine.orchestrator idea "burnout" --variants 4 --aspect-ratio 9:16
 
 # Fully explicit — no interactive prompts
-python -m engine.orchestrator idea "burnout" --variants 6 --formats single_image --aspect-ratio 1:1 --platforms meta
+python -m engine.orchestrator idea "burnout" --variants 6 --formats single_image --aspect-ratio 3:4 --platforms meta
 ```
 
 ### Other commands
@@ -181,8 +181,10 @@ All three strategies support three canvas sizes:
 | Ratio | Canvas | Use Case |
 |-------|--------|----------|
 | 1:1 | 1080×1080 | Meta feed (square) |
-| 4:5 | 1080×1350 | Meta portrait feed |
+| 3:4 | 1080×1440 | Meta portrait feed |
 | 9:16 | 1080×1920 | Stories / Reels |
+
+> **Note:** The portrait ratio is 3:4 (not 4:5). The Imagen API does not support 4:5 — its supported values are 1:1, 9:16, 16:9, 4:3, and 3:4. Meta accepts 3:4 for portrait feed placements.
 
 The HTML/CSS strategy uses larger typography at taller ratios (9:16 gets 68–88px headlines vs. 58–72px at 1:1). The Playwright viewport is resized to match. Imagen and DALL-E use the native aspect ratio parameters of their respective APIs.
 
@@ -233,13 +235,13 @@ data/
     ├── product_context.md     # JotPsych product facts for copy grounding
     ├── style_notes_global.md  # Cross-cutting prefs (all strategies)
     ├── style_notes_photo_1x1.md      # Photography/mixed_media · 1:1
-    ├── style_notes_photo_4x5.md      # Photography/mixed_media · 4:5
+    ├── style_notes_photo_3x4.md      # Photography/mixed_media · 3:4
     ├── style_notes_photo_9x16.md     # Photography/mixed_media · 9:16
     ├── style_notes_illustration_1x1.md
-    ├── style_notes_illustration_4x5.md
+    ├── style_notes_illustration_3x4.md
     ├── style_notes_illustration_9x16.md
     ├── style_notes_graphic_1x1.md    # Text-heavy/abstract/screen_capture · 1:1
-    ├── style_notes_graphic_4x5.md    # Text-heavy/abstract/screen_capture · 4:5
+    ├── style_notes_graphic_3x4.md    # Text-heavy/abstract/screen_capture · 3:4
     ├── style_notes_graphic_9x16.md   # Text-heavy/abstract/screen_capture · 9:16
     ├── liked_photo/           # Liked photo/mixed_media references
     ├── liked_illustration/    # Liked illustration references
@@ -268,7 +270,21 @@ dashboard/frontend/pages/review.html
 - Cards show **numbered badges** (#1, #2, #3...) and respect the actual aspect ratio of the generated image
 - **Like** a variant to save it as a positive reference — image copied to the appropriate `liked_*/` directory, Claude updates "What We Like" in the matching style notes file
 - **Feedback** button — type natural language feedback; Claude sees the actual image and updates the correct style notes file; if feedback targets numeric parameters (e.g. "make the logo bigger"), `brand_config.json` is also updated
-- **Voice Feedback** button — upload an audio recording (.m4a, .mp3, .wav) where you reference ads by number ("Ad 2 needs more whitespace, Ad 5 is too dark"). Whisper transcribes it, Claude extracts the (ad number, feedback) pairs, each routed to the correct style notes file
+- **Voice Feedback** button — record audio directly in the browser; reference ads by number ("Ad 2 needs more whitespace, Ad 5 is too dark"). Whisper transcribes it, Claude extracts the (ad number, feedback) pairs, each routed to the correct style notes file. An "upload file instead" fallback accepts .m4a/.mp3/.wav for recordings made on another device
+
+### Gallery Layout
+
+Variants are grouped by the idea run (brief) that generated them, newest batch first. Each group has a collapsible header row showing:
+- **Concept** — the raw idea text (truncated); hover to see the full prompt in a tooltip
+- **Visual style + aspect ratio** — pill badges showing what type of ads are in the group
+- **Variant count + date** — how many cards and when the batch was generated
+
+**Toolbar controls:**
+- **Filter chips** — filter by visual style, aspect ratio, or platform; filters update the gallery in real time without reloading
+- **Collapse All / Expand All** — fold or unfold all brief groups at once
+- **Show Archive / Show Review** — toggle between draft variants and previously reviewed ones
+
+**Per-group actions:** Each brief group header has **Approve All** and **Reject All** buttons (right-aligned, left of the metadata). These select all variants in the group and trigger the same approve/reject flow — Reject All opens the rejection notes modal and applies the feedback to the whole group.
 
 ### Variant Lifecycle & Viewing Previous Batches
 
@@ -302,13 +318,13 @@ Feedback is routed to the specific style file for the variant's visual style **a
 | Visual Style | Aspect Ratio | File |
 |---|---|---|
 | photography / mixed_media | 1:1 | `style_notes_photo_1x1.md` |
-| photography / mixed_media | 4:5 | `style_notes_photo_4x5.md` |
+| photography / mixed_media | 3:4 | `style_notes_photo_3x4.md` |
 | photography / mixed_media | 9:16 | `style_notes_photo_9x16.md` |
 | illustration | 1:1 | `style_notes_illustration_1x1.md` |
-| illustration | 4:5 | `style_notes_illustration_4x5.md` |
+| illustration | 3:4 | `style_notes_illustration_3x4.md` |
 | illustration | 9:16 | `style_notes_illustration_9x16.md` |
 | text_heavy / abstract / screen_capture | 1:1 | `style_notes_graphic_1x1.md` |
-| text_heavy / abstract / screen_capture | 4:5 | `style_notes_graphic_4x5.md` |
+| text_heavy / abstract / screen_capture | 3:4 | `style_notes_graphic_3x4.md` |
 | text_heavy / abstract / screen_capture | 9:16 | `style_notes_graphic_9x16.md` |
 | unknown / no style | any | `style_notes_global.md` |
 
@@ -319,20 +335,69 @@ Feedback is routed to the specific style file for the variant's visual style **a
 - HTML source files (for HTML/CSS variants) included as few-shot examples in generation
 - Saved to `liked_photo/`, `liked_illustration/`, or `liked_graphic/` by visual type
 
+### Rejection Note Routing
+
+When rejecting a batch, the rejection notes field supports ad-number references — the same intelligence as voice feedback, but for typed text.
+
+If notes say things like _"Ad 2 is too dark, Ad 5 needs better contrast"_, Claude parses out the per-ad feedback and routes each piece to the correct variant's style notes file (matched by visual_style × aspect_ratio). If no ad numbers are mentioned, the full notes are applied to every rejected variant as a bulk update.
+
+The toast notification shows which routing path was used: _"Rejected 3 variant(s) (routed to 2 ads)"_ vs. _"Rejected 3 variant(s)"_.
+
 ### Voice Feedback
 
-Upload a recording via the dashboard's "Voice Feedback" button. The backend:
-1. Transcribes the audio with OpenAI Whisper
-2. Uses Claude to extract (ad number, feedback) pairs from the transcript
-3. Matches ad numbers to variant UUIDs using the gallery's display order
-4. Routes each piece of feedback to the correct style notes file
+Click "Voice Feedback" in the toolbar to open the recording modal. The workflow:
+1. **Record** — browser microphone via `MediaRecorder` API; timer + animated waveform shown during recording
+2. **Process** — audio sent to backend; Whisper transcribes it; Claude extracts (ad number, feedback) pairs
+3. **Route** — each pair matched to a variant UUID using the gallery's display numbers at the time the modal was opened, then routed to the correct style notes file
+
+Card numbers are **frozen when the modal opens** — changing filters (which renumber cards) after you've recorded does not corrupt the mapping.
+
+Fallback: click "upload file instead" to supply a pre-recorded .m4a/.mp3/.wav from another device.
 
 ---
 
-## Steps 6-9: Deploy → Track → Decide → Regress
+## Step 6: Deploy (deployer.py)
 
-These stages form the operational loop once ads are live. Currently:
-- **Deploy (deployer.py):** STUB — Meta and Google API integration not yet built
+Approved variants can be deployed to Meta directly from the dashboard. The deployer uses the `facebook-business` Python SDK.
+
+### How to deploy an ad
+
+1. Generate and approve a variant in the review dashboard
+2. Switch to **Archive** (approved variants live here)
+3. Double-click a card to expand it → click **Deploy to Meta**
+4. Select an **Ad Set** from the dropdown (populated from your Meta account)
+5. Enter or confirm the **destination URL**
+6. Check the confirmation box and click **Deploy**
+
+The ad is created in **PAUSED** status so it appears in Ads Manager but does not enter Meta's review queue yet. Go to Meta Ads Manager, confirm the creative looks correct, then set it to Active to begin review. You'll receive a Slack notification when it's submitted and another when Meta approves or rejects it.
+
+### Meta review outcomes
+
+- **Approved** → Slack posts "Ad approved and live." The variant card shows a green "Meta: Live" badge.
+- **Rejected** → Slack posts the rejection reason(s). The variant is automatically moved back to Draft so you can edit and redeploy.
+
+Review status polling runs automatically as part of the daily cycle. You can also trigger it manually:
+```
+POST /api/meta/poll-status
+```
+
+### Environment variables required for deployment
+
+| Variable | Description |
+|---|---|
+| `META_ACCESS_TOKEN` | Long-lived token with `ads_management`, `ads_read`, `pages_manage_ads` permissions |
+| `META_AD_ACCOUNT_ID` | Your ad account ID (format: `act_XXXXXXXXXX`) |
+| `META_APP_ID` | Meta app ID |
+| `META_APP_SECRET` | Meta app secret |
+| `META_PAGE_ID` | Facebook Page ID (required to create AdCreatives) |
+| `META_DESTINATION_URL` | Default landing page URL (can be overridden per deploy) |
+
+If `META_ACCESS_TOKEN` is not set, the deployer initializes without Meta support — idea generation and everything else works normally.
+
+---
+
+## Steps 7-9: Track → Decide → Regress
+
 - **Track (tracker.py):** STUB — daily metric pulls not yet built
 - **Decide (engine.py):** IMPLEMENTED — scale/kill/wait logic ready, needs live data
 - **Regress (model.py):** IMPLEMENTED — OLS regression on taxonomy, needs 20+ observations
@@ -364,7 +429,7 @@ Drop reference materials into `data/style_references/`:
     "logo": { "width_px": 320, "top_px": 40, "left_px": 40 },
     "typography_by_ratio": {
         "1:1":  { "headline_size_range": [58, 72], "body_size_range": [22, 28], "cta_size_range": [20, 24] },
-        "4:5":  { "headline_size_range": [60, 76], "body_size_range": [22, 28], "cta_size_range": [20, 24] },
+        "3:4":  { "headline_size_range": [60, 76], "body_size_range": [22, 28], "cta_size_range": [20, 24] },
         "9:16": { "headline_size_range": [68, 88], "body_size_range": [26, 32], "cta_size_range": [22, 26] }
     },
     "layout": { "padding_min_px": 80 }
@@ -388,7 +453,11 @@ These values are injected into the generation prompt. The feedback processor can
 | `/api/feedback/like` | POST | Like an image — save as reference, update style notes |
 | `/api/feedback/voice` | POST | Upload audio recording — transcribe, parse ad numbers, route feedback |
 | `/api/feedback/style-notes` | GET | Get all style notes files for display |
+| `/api/briefs` | GET | List all briefs sorted newest first (used for gallery group headers) |
 | `/api/variants` | GET | List all variants (optional `?status=` filter) |
+| `/api/meta/adsets` | GET | List active Meta ad sets (for deploy modal dropdown) |
+| `/api/deploy` | POST | Deploy an approved variant to Meta |
+| `/api/meta/poll-status` | POST | Manually poll Meta review status for all live variants |
 | `/api/performance` | GET | Portfolio-level performance summary |
 | `/api/performance/{id}` | GET | Single variant performance data |
 | `/api/decisions` | GET | Run and return latest scale/kill/wait decisions |
@@ -403,8 +472,13 @@ These values are injected into the generation prompt. The feedback processor can
 | `ANTHROPIC_API_KEY` | Intake, copy gen, HTML/CSS strategy, feedback | Claude API key |
 | `OPENAI_API_KEY` | DALL-E strategy, voice feedback (Whisper) | OpenAI API key |
 | `GOOGLE_GEMINI_API_KEY` | Imagen strategy | Google Gemini API key |
-| `META_ACCESS_TOKEN` | Deploy, Track (future) | Meta Marketing API |
-| `SLACK_WEBHOOK_URL` | Notifications (future) | Slack incoming webhook |
+| `META_ACCESS_TOKEN` | Meta deployment | Long-lived token with ads_management, ads_read, pages_manage_ads |
+| `META_AD_ACCOUNT_ID` | Meta deployment | Ad account ID (format: `act_XXXXXXXXXX`) |
+| `META_APP_ID` | Meta deployment | Meta app ID |
+| `META_APP_SECRET` | Meta deployment | Meta app secret |
+| `META_PAGE_ID` | Meta deployment | Facebook Page ID for AdCreative |
+| `META_DESTINATION_URL` | Meta deployment | Default landing page (default: `https://jotpsych.com`) |
+| `SLACK_WEBHOOK_URL` | Slack notifications | Incoming webhook URL for `#ads-engine` channel |
 
 ---
 

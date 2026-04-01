@@ -34,6 +34,7 @@ from engine.review.reviewer import ReviewPipeline
 from engine.decisions.engine import DecisionEngine
 from engine.regression.model import CreativeRegressionModel
 from engine.notifications import SlackNotifier
+from engine.deployment.deployer import AdDeployer
 
 app = FastAPI(title="JotPsych Ads Engine", version="0.1.0")
 
@@ -53,7 +54,8 @@ store = Store()
 review_pipeline = ReviewPipeline(store)
 decision_engine = DecisionEngine(store)
 regression_model = CreativeRegressionModel(store)
-notifier = SlackNotifier()
+notifier = SlackNotifier(webhook_url=__import__("os").getenv("SLACK_WEBHOOK_URL"))
+deployer = AdDeployer.from_env(store)
 
 
 # ---------------------------------------------------------------------------
@@ -69,6 +71,7 @@ class ReviewAction(BaseModel):
     variant_ids: list[str]
     reviewer: str
     notes: Optional[str] = None
+    display_map: Optional[dict[str, str]] = None  # { "1": "variant-uuid", ... }
 
 
 class ImageFeedback(BaseModel):
@@ -81,6 +84,12 @@ class ImageLike(BaseModel):
     variant_id: str
     note: Optional[str] = None
     aspect_ratio: Optional[str] = None
+
+
+class DeployRequest(BaseModel):
+    variant_id: str
+    adset_id: str
+    destination_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -131,11 +140,109 @@ async def approve_variants(action: ReviewAction):
 
 @app.post("/api/review/reject")
 async def reject_variants(action: ReviewAction):
-    """Reject variants with feedback."""
+    """Reject variants with feedback and route notes to style guides.
+
+    If the notes reference specific ad numbers (e.g. "Ad 2 is too dark, Ad 5 too busy")
+    and a display_map is provided, Claude parses out per-ad feedback and routes each piece
+    to the correct variant's style notes file.
+
+    If no ad numbers are detected, the full notes are applied to every rejected variant.
+    """
     if not action.notes:
         raise HTTPException(status_code=400, detail="Rejection notes are required")
+
     rejected = review_pipeline.batch_reject(action.variant_ids, action.reviewer, action.notes)
-    return {"rejected": len(rejected)}
+
+    from engine.generation.strategies import VISUAL_STYLE_STRATEGY_MAP
+
+    # Build a UUID→variant lookup from the rejected list for fast access
+    rejected_by_id = {v.id: v for v in rejected}
+
+    # --- Try to parse ad-number references if a display_map was supplied ---
+    per_ad_feedback: list[dict] = []  # [{"ad_number": "2", "feedback": "...", "variant_id": "uuid"}]
+
+    if action.display_map and action.notes:
+        try:
+            from anthropic import Anthropic
+            import json as _json
+
+            claude = Anthropic()
+            parse_response = claude.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1000,
+                system=(
+                    "Extract all (ad_number, feedback_text) pairs from the reviewer's notes. "
+                    "The reviewer references ads by number (e.g. 'Ad 2', '#3', 'the third one'). "
+                    "Return a JSON array only, no explanation: "
+                    '[{"ad_number": <int>, "feedback": "<feedback text>"}]. '
+                    "If there are no ad number references, return an empty array []."
+                ),
+                messages=[{"role": "user", "content": action.notes}],
+            )
+            pairs_text = parse_response.content[0].text.strip()
+            if pairs_text.startswith("```"):
+                pairs_text = pairs_text.split("```")[1].split("```")[0].strip()
+                if pairs_text.startswith("json"):
+                    pairs_text = pairs_text[4:].strip()
+            pairs: list[dict] = _json.loads(pairs_text)
+
+            for pair in pairs:
+                ad_num = str(pair.get("ad_number", ""))
+                feedback_text = pair.get("feedback", "").strip()
+                variant_id = action.display_map.get(ad_num)
+                if feedback_text and variant_id and variant_id in rejected_by_id:
+                    per_ad_feedback.append({
+                        "ad_number": ad_num,
+                        "feedback": feedback_text,
+                        "variant_id": variant_id,
+                    })
+        except Exception:
+            per_ad_feedback = []  # Fall through to bulk routing below
+
+    # --- Route feedback to style notes ---
+    if per_ad_feedback:
+        # Per-ad routing: each piece of feedback goes only to its specific variant's style file
+        for item in per_ad_feedback:
+            variant = rejected_by_id[item["variant_id"]]
+            try:
+                visual_style = variant.taxonomy.visual_style if variant.taxonomy else None
+                aspect_ratio = variant.taxonomy.aspect_ratio if variant.taxonomy else None
+                strategy_name = VISUAL_STYLE_STRATEGY_MAP.get(visual_style or "", None)
+                feedback_processor.process_feedback(
+                    feedback=item["feedback"],
+                    variant_id=variant.id,
+                    visual_style=visual_style,
+                    aspect_ratio=aspect_ratio,
+                    strategy_name=strategy_name,
+                    taxonomy=variant.taxonomy.model_dump() if variant.taxonomy else None,
+                    asset_path=variant.asset_path,
+                )
+            except Exception:
+                pass
+    else:
+        # Bulk routing: no ad numbers detected — apply the full notes to every rejected variant
+        for variant in rejected:
+            try:
+                visual_style = variant.taxonomy.visual_style if variant.taxonomy else None
+                aspect_ratio = variant.taxonomy.aspect_ratio if variant.taxonomy else None
+                strategy_name = VISUAL_STYLE_STRATEGY_MAP.get(visual_style or "", None)
+                feedback_processor.process_feedback(
+                    feedback=action.notes,
+                    variant_id=variant.id,
+                    visual_style=visual_style,
+                    aspect_ratio=aspect_ratio,
+                    strategy_name=strategy_name,
+                    taxonomy=variant.taxonomy.model_dump() if variant.taxonomy else None,
+                    asset_path=variant.asset_path,
+                )
+            except Exception:
+                pass
+
+    return {
+        "rejected": len(rejected),
+        "feedback_routing": "per_ad" if per_ad_feedback else "bulk",
+        "per_ad_feedback": per_ad_feedback,
+    }
 
 
 @app.post("/api/review/return-to-review")
@@ -460,3 +567,89 @@ async def list_variants(status: Optional[str] = None):
         "count": len(variants),
         "variants": [v.model_dump() for v in variants],
     }
+
+
+@app.get("/api/briefs")
+async def list_briefs():
+    """Return brief metadata for group headers in the review gallery."""
+    briefs = store.get_all_briefs()
+    briefs.sort(key=lambda b: b.created_at, reverse=True)
+    return [
+        {
+            "id": b.id,
+            "raw_input": b.raw_input,
+            "value_proposition": b.value_proposition,
+            "created_at": b.created_at.isoformat(),
+        }
+        for b in briefs
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Meta Deployment
+# ---------------------------------------------------------------------------
+
+@app.get("/api/meta/adsets")
+async def list_meta_adsets():
+    """List active adsets in the Meta account — used to populate the deploy modal dropdown."""
+    if not deployer.meta:
+        raise HTTPException(
+            status_code=503,
+            detail="Meta deployer not configured — set META_ACCESS_TOKEN in .env",
+        )
+    try:
+        adsets = deployer.meta.list_adsets()
+        return {"adsets": adsets}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Meta API error: {e}")
+
+
+@app.post("/api/deploy")
+async def deploy_variant_to_meta(body: DeployRequest):
+    """
+    Deploy an APPROVED variant to Meta.
+
+    Sets status = LIVE, meta_review_status = pending_review.
+    Sends a Slack notification.
+    """
+    if not deployer.meta:
+        raise HTTPException(
+            status_code=503,
+            detail="Meta deployer not configured — set META_ACCESS_TOKEN in .env",
+        )
+    try:
+        variant = store.get_variant(body.variant_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    try:
+        deployed = deployer.deploy_variant(
+            variant,
+            adset_id=body.adset_id,
+            destination_url=body.destination_url,
+        )
+        notifier.notify_meta_submitted(deployed, deployed.meta_ad_id)
+        return {
+            "status": "submitted",
+            "meta_ad_id": deployed.meta_ad_id,
+            "meta_review_status": deployed.meta_review_status,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Meta API error: {e}")
+
+
+@app.post("/api/meta/poll-status")
+async def poll_meta_status():
+    """
+    Manually trigger ad review status polling for all LIVE Meta variants.
+    Also runs automatically in the daily orchestrator cycle.
+    """
+    if not deployer.meta:
+        raise HTTPException(
+            status_code=503,
+            detail="Meta deployer not configured — set META_ACCESS_TOKEN in .env",
+        )
+    updates = deployer.poll_meta_ad_statuses(notifier=notifier)
+    return {"updates_processed": len(updates), "updates": updates}

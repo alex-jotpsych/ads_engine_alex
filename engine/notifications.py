@@ -120,18 +120,49 @@ class SlackNotifier:
         )
         self._send(message, channel=ALERTS_CHANNEL)
 
+    def notify_meta_submitted(self, variant: AdVariant, meta_ad_id: str) -> None:
+        """Post immediately after an ad is submitted to Meta for review."""
+        message = (
+            f"📤 *Ad Submitted to Meta for Review*\n"
+            f"Variant: `{variant.id[:8]}` — {variant.headline[:60]}\n"
+            f"Meta Ad ID: `{meta_ad_id}`\n"
+            f"Review typically takes 24–48 hours. You'll get a notification when it's approved or rejected."
+        )
+        self._send(message)
+
+    def notify_meta_approved(self, variant: AdVariant) -> None:
+        """Post when Meta approves an ad and it goes live."""
+        message = (
+            f"✅ *Ad Approved and Live on Meta*\n"
+            f"Variant: `{variant.id[:8]}` — {variant.headline[:60]}\n"
+            f"Meta Ad ID: `{variant.meta_ad_id}`"
+        )
+        self._send(message)
+
+    def notify_meta_rejected(self, variant: AdVariant, reasons: list[str]) -> None:
+        """Post when Meta rejects an ad. Variant is automatically returned to draft."""
+        reasons_text = ", ".join(reasons) if reasons else "unspecified"
+        message = (
+            f"🚫 *Ad Rejected by Meta*\n"
+            f"Variant: `{variant.id[:8]}` — {variant.headline[:60]}\n"
+            f"Rejection reasons: {reasons_text}\n"
+            f"The variant has been returned to Draft — edit the copy or image and redeploy."
+        )
+        self._send(message, channel=ALERTS_CHANNEL)
+
     def _send(self, message: str, channel: Optional[str] = None) -> None:
-        """
-        Send a message to Slack.
-
-        For now, prints to stdout. The intern should implement:
-        1. Webhook-based sending for scheduled/background jobs
-        2. MCP integration for Claude Code interactive use
-        """
+        """Send a message to Slack via webhook, falling back to stdout."""
         target = channel or self.channel
-        print(f"[SLACK → {target}] {message}")
-
-        # INTERN: Implement webhook sending
-        # if self.webhook_url:
-        #     import requests
-        #     requests.post(self.webhook_url, json={"text": message, "channel": target})
+        if self.webhook_url and "hooks.slack.com/services/" in self.webhook_url:
+            try:
+                import requests
+                requests.post(
+                    self.webhook_url,
+                    json={"text": message},
+                    timeout=5,
+                )
+            except Exception as e:
+                print(f"[SLACK SEND FAILED] {e}")
+                print(f"[SLACK → {target}] {message}")
+        else:
+            print(f"[SLACK → {target}] {message}")

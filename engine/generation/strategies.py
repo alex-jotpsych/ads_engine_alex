@@ -33,11 +33,11 @@ BRAND_DIR = STYLE_REFS_DIR / "brand"
 # Dimensions and API params for each supported aspect ratio
 ASPECT_RATIO_DIMS = {
     "1:1":  {"width": 1080, "height": 1080, "imagen": "1:1",  "dalle": "1024x1024"},
-    "4:5":  {"width": 1080, "height": 1350, "imagen": "4:5",  "dalle": "1024x1024"},
+    "3:4":  {"width": 1080, "height": 1440, "imagen": "3:4",  "dalle": "1024x1024"},
     "9:16": {"width": 1080, "height": 1920, "imagen": "9:16", "dalle": "1024x1792"},
 }
 
-RATIO_SLUG = {"1:1": "1x1", "4:5": "4x5", "9:16": "9x16"}
+RATIO_SLUG = {"1:1": "1x1", "3:4": "3x4", "9:16": "9x16"}
 
 
 def load_style_notes(strategy_type: str = "global", aspect_ratio: str = "1:1") -> str:

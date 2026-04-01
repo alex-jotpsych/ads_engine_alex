@@ -22,19 +22,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 20;
         }
-
-        .header h1 {
-            font-size: 15px;
-            font-weight: 500;
-            color: #1a1a1a;
-            letter-spacing: -0.01em;
-        }
-
-        .header .stats {
-            font-size: 13px;
-            color: #9B9B9B;
-        }
+        .header h1 { font-size: 15px; font-weight: 500; color: #1a1a1a; letter-spacing: -0.01em; }
+        .header .stats { font-size: 13px; color: #9B9B9B; }
 
         /* ---- Toolbar ---- */
         .toolbar {
@@ -44,9 +37,13 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap;
+            position: sticky;
+            top: 49px;
+            z-index: 19;
         }
 
-        .toolbar button {
+        .toolbar button, .toolbar select {
             padding: 6px 12px;
             border-radius: 5px;
             border: 1px solid #E8E8E6;
@@ -54,17 +51,37 @@
             color: #6B6B6B;
             cursor: pointer;
             font-size: 13px;
-            font-weight: 400;
+            font-family: inherit;
             transition: all 0.1s;
         }
-
         .toolbar button:hover { background: #F8F8F7; color: #1a1a1a; border-color: #d0d0ce; }
         .toolbar button.approve { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
         .toolbar button.approve:hover { background: #dcfce7; }
-        .toolbar button.reject { color: #991b1b; border-color: #fecaca; background: #fef2f2; }
-        .toolbar button.reject:hover { background: #fee2e2; }
-        .toolbar-divider { width: 1px; height: 20px; background: #E8E8E6; margin: 0 4px; }
-        .toolbar-spacer { flex: 1; }
+        .toolbar button.reject  { color: #991b1b; border-color: #fecaca; background: #fef2f2; }
+        .toolbar button.reject:hover  { background: #fee2e2; }
+
+        .toolbar-divider { width: 1px; height: 20px; background: #E8E8E6; margin: 0 4px; flex-shrink: 0; }
+        .toolbar-spacer  { flex: 1; }
+
+        /* Filter selects styled as chips */
+        .filter-chip {
+            padding: 5px 10px;
+            border-radius: 5px;
+            border: 1px solid #E8E8E6;
+            background: #fff;
+            color: #6B6B6B;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 22px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239B9B9B'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+        }
+        .filter-chip:focus { outline: none; border-color: #2B6CB0; }
+        .filter-chip.active { background-color: #EBF4FF; border-color: #BFDBFE; color: #1d4ed8; }
 
         .archive-filter {
             padding: 5px 10px;
@@ -80,51 +97,147 @@
         .archive-filter.active { background: #EBF4FF; border-color: #BFDBFE; color: #1d4ed8; }
 
         .style-notes-btn {
-            padding: 6px 12px;
-            border-radius: 5px;
-            border: 1px solid #E8E8E6;
-            background: #fff;
-            color: #6B6B6B;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.1s;
+            padding: 6px 12px; border-radius: 5px; border: 1px solid #E8E8E6;
+            background: #fff; color: #6B6B6B; cursor: pointer; font-size: 13px; transition: all 0.1s;
         }
         .style-notes-btn:hover { background: #F8F8F7; color: #1a1a1a; }
         .style-notes-btn.active { background: #EBF4FF; border-color: #BFDBFE; color: #1d4ed8; }
 
         .voice-btn {
-            padding: 6px 12px;
-            border-radius: 5px;
-            border: 1px solid #E8E8E6;
-            background: #fff;
-            color: #6B6B6B;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.1s;
+            padding: 6px 12px; border-radius: 5px; border: 1px solid #E8E8E6;
+            background: #fff; color: #6B6B6B; cursor: pointer; font-size: 13px; transition: all 0.1s;
         }
         .voice-btn:hover { background: #F8F8F7; color: #1a1a1a; }
 
         /* ---- Style Notes Panel ---- */
         .style-notes-panel {
-            display: none;
-            background: #fff;
-            border-bottom: 1px solid #E8E8E6;
-            padding: 20px 32px;
+            display: none; background: #fff; border-bottom: 1px solid #E8E8E6; padding: 20px 32px;
         }
         .style-notes-panel.active { display: block; }
-        .style-notes-panel h3 {
+        .style-notes-panel h3 { font-size: 13px; font-weight: 500; color: #1a1a1a; margin-bottom: 16px; }
+
+        /* ---- Brief group ---- */
+        .brief-group { margin-bottom: 8px; }
+
+        .brief-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 32px;
+            background: #fff;
+            border-top: 1px solid #E8E8E6;
+            border-bottom: 1px solid #E8E8E6;
+            cursor: pointer;
+            user-select: none;
+            position: sticky;
+            top: 98px;  /* below header + toolbar */
+            z-index: 10;
+        }
+        .brief-header:hover { background: #FAFAF9; }
+
+        .brief-concept {
             font-size: 13px;
-            font-weight: 500;
+            font-weight: 600;
             color: #1a1a1a;
-            margin-bottom: 16px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+            position: relative;
         }
 
-        /* ---- Gallery ---- */
-        .gallery {
+        /* Custom tooltip for full prompt text */
+        .brief-concept[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            background: #1a1a1a;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 400;
+            padding: 8px 12px;
+            border-radius: 6px;
+            white-space: normal;
+            max-width: 420px;
+            min-width: 200px;
+            width: max-content;
+            z-index: 100;
+            pointer-events: none;
+            line-height: 1.5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+        }
+
+        /* Right-aligned group inside brief-header */
+        .brief-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: auto;
+        }
+
+        .brief-action-btn {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 9px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.1s;
+            white-space: nowrap;
+        }
+        .brief-action-btn.approve { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
+        .brief-action-btn.approve:hover { background: #dcfce7; }
+        .brief-action-btn.reject  { color: #991b1b; border-color: #fecaca; background: #fef2f2; }
+        .brief-action-btn.reject:hover  { background: #fee2e2; }
+
+        .brief-header-divider {
+            width: 1px;
+            height: 14px;
+            background: #E8E8E6;
+            flex-shrink: 0;
+        }
+
+        .brief-tags {
+            display: flex;
+            gap: 4px;
+        }
+
+        .brief-tag {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 3px;
+            background: #F0F0EE;
+            color: #6B6B6B;
+            white-space: nowrap;
+        }
+
+        .brief-tag.ratio { background: #EBF4FF; color: #1d4ed8; }
+
+        .brief-meta {
+            font-size: 12px;
+            color: #9B9B9B;
+            white-space: nowrap;
+        }
+
+        .brief-collapse-icon {
+            font-size: 11px;
+            color: #9B9B9B;
+            transition: transform 0.15s;
+        }
+        .brief-group.collapsed .brief-collapse-icon { transform: rotate(-90deg); }
+        .brief-group.collapsed .gallery-section { display: none; }
+
+        /* ---- Gallery section (within a brief group) ---- */
+        .gallery-section {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
             gap: 16px;
-            padding: 24px 32px;
+            padding: 20px 32px;
         }
 
         /* ---- Card ---- */
@@ -140,7 +253,6 @@
         .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-color: #d8d8d6; }
         .card.selected { border-color: #2B6CB0; box-shadow: inset 3px 0 0 #2B6CB0, 0 2px 8px rgba(43,108,176,0.1); }
 
-        /* Image container — respects actual aspect ratio */
         .card .asset {
             width: 100%;
             background: #F8F8F7;
@@ -155,409 +267,187 @@
         .card .asset.ratio-1x1  { aspect-ratio: 1 / 1; }
         .card .asset.ratio-4x5  { aspect-ratio: 4 / 5; }
         .card .asset.ratio-9x16 { aspect-ratio: 9 / 16; }
+        .card .asset img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-        .card .asset img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        /* Numbered badge */
         .card-number {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0,0,0,0.5);
-            color: #fff;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 10px;
-            z-index: 2;
-            letter-spacing: 0.02em;
-            pointer-events: none;
+            position: absolute; top: 8px; left: 8px;
+            background: rgba(0,0,0,0.5); color: #fff;
+            font-size: 11px; font-weight: 700;
+            padding: 2px 7px; border-radius: 10px;
+            z-index: 2; pointer-events: none;
         }
 
         .card .content { padding: 14px; }
-
-        .card .headline {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 6px;
-            line-height: 1.35;
-        }
-
+        .card .headline { font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 6px; line-height: 1.35; }
         .card .primary-text {
-            font-size: 13px;
-            color: #6B6B6B;
-            line-height: 1.5;
-            margin-bottom: 10px;
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-size: 13px; color: #6B6B6B; line-height: 1.5; margin-bottom: 10px;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
         }
-
-        .card .tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 4px;
-            margin-bottom: 10px;
-        }
-
+        .card .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
         .card .tag {
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            padding: 2px 7px;
-            border-radius: 3px;
-            background: #F0F0EE;
-            color: #6B6B6B;
+            font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px;
+            padding: 2px 7px; border-radius: 3px; background: #F0F0EE; color: #6B6B6B;
         }
-
-        .card .card-actions {
-            display: flex;
-            align-items: center;
-            gap: 2px;
-            margin-top: 6px;
-        }
-
-        .card .cta-label {
-            font-size: 12px;
-            color: #9B9B9B;
-            margin-right: auto;
-            font-style: italic;
-        }
-
+        .card .card-actions { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
+        .card .cta-label { font-size: 12px; color: #9B9B9B; margin-right: auto; font-style: italic; }
         .card .action-link {
-            font-size: 12px;
-            color: #9B9B9B;
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: color 0.1s, background 0.1s;
+            font-size: 12px; color: #9B9B9B; background: none; border: none;
+            cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.1s, background 0.1s;
         }
         .card .action-link:hover { color: #1a1a1a; background: #F0F0EE; }
         .card .action-link.like:hover { color: #166534; background: #f0fdf4; }
         .card .action-link.feedback:hover { color: #92400e; background: #fffbeb; }
 
         .card .status-badge {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            display: inline-block; margin-top: 8px; padding: 3px 8px; border-radius: 3px;
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
         }
         .status-badge.approved { background: #f0fdf4; color: #166534; }
         .status-badge.rejected { background: #fef2f2; color: #991b1b; }
         .status-badge.draft    { background: #EBF4FF; color: #1d4ed8; }
 
-        .card .review-info {
-            font-size: 11px;
-            color: #9B9B9B;
-            margin-top: 4px;
+        /* Meta review status badges (on live/archive cards) */
+        .meta-badge {
+            display: inline-block; margin-top: 5px; padding: 2px 7px; border-radius: 3px;
+            font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
         }
+        .meta-badge.pending   { background: #fffbeb; color: #92400e; }
+        .meta-badge.active    { background: #f0fdf4; color: #166534; }
+        .meta-badge.disapproved { background: #fef2f2; color: #991b1b; cursor: help; }
+        .card .review-info { font-size: 11px; color: #9B9B9B; margin-top: 4px; }
 
         /* ---- Empty state ---- */
         .empty-state {
-            text-align: center;
-            padding: 80px 40px;
-            color: #9B9B9B;
-            font-size: 14px;
-            grid-column: 1 / -1;
+            text-align: center; padding: 80px 40px; color: #9B9B9B;
+            font-size: 14px; grid-column: 1 / -1;
         }
+        .empty-gallery { text-align: center; padding: 80px 40px; color: #9B9B9B; font-size: 14px; }
 
         /* ---- Toast ---- */
         .feedback-toast {
-            display: none;
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            color: #166534;
-            padding: 10px 18px;
-            border-radius: 7px;
-            font-size: 13px;
-            z-index: 200;
+            display: none; position: fixed; bottom: 24px; right: 24px;
+            background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534;
+            padding: 10px 18px; border-radius: 7px; font-size: 13px; z-index: 300;
             animation: fadeIn 0.18s ease;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ---- Modals (shared) ---- */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.35);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center;
         }
         .modal-overlay.active { display: flex; }
 
         .modal-box {
-            background: #fff;
-            border: 1px solid #E8E8E6;
-            border-radius: 10px;
-            padding: 24px;
-            width: 440px;
-            max-width: 90vw;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            background: #fff; border: 1px solid #E8E8E6; border-radius: 10px; padding: 24px;
+            width: 440px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,0.12);
         }
-
-        .modal-box h3 {
-            font-size: 15px;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 4px;
-        }
-
-        .modal-box p {
-            font-size: 13px;
-            color: #6B6B6B;
-            margin-bottom: 14px;
-            line-height: 1.5;
-        }
-
+        .modal-box h3 { font-size: 15px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+        .modal-box p  { font-size: 13px; color: #6B6B6B; margin-bottom: 14px; line-height: 1.5; }
         .modal-box textarea {
-            width: 100%;
-            height: 110px;
-            background: #F8F8F7;
-            border: 1px solid #E8E8E6;
-            border-radius: 6px;
-            color: #1a1a1a;
-            padding: 10px 12px;
-            font-size: 13px;
-            font-family: inherit;
-            resize: vertical;
-            margin-bottom: 14px;
-            outline: none;
+            width: 100%; height: 110px; background: #F8F8F7; border: 1px solid #E8E8E6;
+            border-radius: 6px; color: #1a1a1a; padding: 10px 12px; font-size: 13px;
+            font-family: inherit; resize: vertical; margin-bottom: 14px; outline: none;
         }
         .modal-box textarea:focus { border-color: #2B6CB0; box-shadow: 0 0 0 2px rgba(43,108,176,0.1); }
 
-        .modal-box input[type="file"] {
-            width: 100%;
-            background: #F8F8F7;
-            border: 1px solid #E8E8E6;
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 13px;
-            font-family: inherit;
-            margin-bottom: 14px;
-            cursor: pointer;
-        }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
-        .modal-actions {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-        }
-
-        .btn-cancel {
-            padding: 7px 14px;
-            background: #fff;
-            border: 1px solid #E8E8E6;
-            border-radius: 5px;
-            color: #6B6B6B;
-            cursor: pointer;
-            font-size: 13px;
-        }
+        .btn-cancel { padding: 7px 14px; background: #fff; border: 1px solid #E8E8E6; border-radius: 5px; color: #6B6B6B; cursor: pointer; font-size: 13px; }
         .btn-cancel:hover { background: #F8F8F7; color: #1a1a1a; }
-
-        .btn-primary {
-            padding: 7px 14px;
-            background: #1C1E85;
-            border: 1px solid #1C1E85;
-            border-radius: 5px;
-            color: #fff;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-        }
+        .btn-primary { padding: 7px 14px; background: #1C1E85; border: 1px solid #1C1E85; border-radius: 5px; color: #fff; cursor: pointer; font-size: 13px; font-weight: 500; }
         .btn-primary:hover { background: #1719a0; }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .btn-danger {
-            padding: 7px 14px;
-            background: #fef2f2;
-            border: 1px solid #fecaca;
-            border-radius: 5px;
-            color: #991b1b;
-            cursor: pointer;
-            font-size: 13px;
-        }
+        .btn-danger  { padding: 7px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 5px; color: #991b1b; cursor: pointer; font-size: 13px; }
         .btn-danger:hover { background: #fee2e2; }
-
-        .btn-positive {
-            padding: 7px 14px;
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 5px;
-            color: #166534;
-            cursor: pointer;
-            font-size: 13px;
-        }
+        .btn-positive { padding: 7px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 5px; color: #166534; cursor: pointer; font-size: 13px; }
         .btn-positive:hover { background: #dcfce7; }
         .btn-positive:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { padding: 7px 14px; background: #F8F8F7; border: 1px solid #E8E8E6; border-radius: 5px; color: #6B6B6B; cursor: pointer; font-size: 13px; }
+        .btn-secondary:hover { background: #F0F0EE; color: #1a1a1a; }
 
-        /* Voice result area */
-        .voice-result {
-            margin-top: 14px;
-            padding: 12px;
-            background: #F8F8F7;
-            border: 1px solid #E8E8E6;
-            border-radius: 6px;
-            font-size: 12px;
-            color: #6B6B6B;
-            line-height: 1.6;
+        /* ---- Voice recording modal ---- */
+        .voice-modal-box { width: 480px; }
+
+        .recording-ui { margin: 16px 0; }
+
+        .rec-idle, .rec-recording, .rec-ready, .rec-processing, .rec-done {
             display: none;
         }
-        .voice-result.active { display: block; }
-        .voice-result strong { color: #1a1a1a; font-weight: 600; }
+        .rec-idle.active, .rec-recording.active, .rec-ready.active,
+        .rec-processing.active, .rec-done.active { display: block; }
+
+        .rec-btn-row { display: flex; align-items: center; gap: 10px; }
+
+        .rec-dot {
+            width: 10px; height: 10px; border-radius: 50%; background: #ef4444;
+            animation: pulse 1s infinite; flex-shrink: 0;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .rec-timer { font-size: 13px; font-weight: 600; color: #1a1a1a; font-variant-numeric: tabular-nums; }
+
+        .rec-waveform {
+            display: flex; align-items: center; gap: 2px; height: 24px; margin-left: 4px;
+        }
+        .rec-bar {
+            width: 3px; background: #ef4444; border-radius: 2px;
+            animation: bar-bounce 0.6s ease-in-out infinite alternate;
+        }
+        .rec-bar:nth-child(2) { animation-delay: 0.1s; }
+        .rec-bar:nth-child(3) { animation-delay: 0.2s; }
+        .rec-bar:nth-child(4) { animation-delay: 0.3s; }
+        .rec-bar:nth-child(5) { animation-delay: 0.4s; }
+        @keyframes bar-bounce { from { height: 4px; } to { height: 20px; } }
+
+        .rec-ready-label { font-size: 13px; color: #6B6B6B; margin-bottom: 12px; }
+
+        .rec-result {
+            margin-top: 14px; padding: 12px; background: #F8F8F7;
+            border: 1px solid #E8E8E6; border-radius: 6px;
+            font-size: 12px; color: #6B6B6B; line-height: 1.6; display: none;
+        }
+        .rec-result.active { display: block; }
+        .rec-result strong { color: #1a1a1a; font-weight: 600; }
+
+        .upload-fallback {
+            margin-top: 12px; text-align: center;
+        }
+        .upload-fallback label {
+            font-size: 12px; color: #9B9B9B; cursor: pointer; text-decoration: underline;
+        }
+        .upload-fallback input { display: none; }
 
         /* ---- Expand overlay ---- */
         .expand-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 150;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 150; align-items: center; justify-content: center; padding: 40px;
         }
         .expand-overlay.active { display: flex; }
-
-        .expand-container {
-            display: flex;
-            gap: 28px;
-            max-width: 1100px;
-            max-height: 90vh;
-            width: 100%;
-        }
-
+        .expand-container { display: flex; gap: 28px; max-width: 1100px; max-height: 90vh; width: 100%; }
         .expand-image {
-            flex: 0 0 auto;
-            max-width: 520px;
-            max-height: 90vh;
-            border-radius: 10px;
-            overflow: hidden;
-            background: #F8F8F7;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            flex: 0 0 auto; max-width: 520px; max-height: 90vh; border-radius: 10px;
+            overflow: hidden; background: #F8F8F7; display: flex; align-items: center; justify-content: center;
         }
-
-        .expand-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            cursor: zoom-in;
-            transition: transform 0.2s ease;
-        }
+        .expand-image img { width: 100%; height: 100%; object-fit: contain; cursor: zoom-in; transition: transform 0.2s ease; }
         .expand-image img.zoomed { cursor: zoom-out; transform: scale(2); transform-origin: center center; }
-
         .expand-details {
-            flex: 1;
-            overflow-y: auto;
-            color: #1a1a1a;
-            background: #fff;
-            border-radius: 10px;
-            padding: 24px;
-            border: 1px solid #E8E8E6;
+            flex: 1; overflow-y: auto; color: #1a1a1a; background: #fff;
+            border-radius: 10px; padding: 24px; border: 1px solid #E8E8E6;
         }
-
-        .expand-details .expand-headline {
-            font-size: 22px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 14px;
-            line-height: 1.3;
-        }
-
-        .expand-details .expand-primary-text {
-            font-size: 14px;
-            color: #6B6B6B;
-            line-height: 1.7;
-            margin-bottom: 16px;
-        }
-
-        .expand-details .expand-description {
-            font-size: 13px;
-            color: #6B6B6B;
-            line-height: 1.6;
-            margin-bottom: 16px;
-            padding: 10px 12px;
-            background: #F8F8F7;
-            border-radius: 6px;
-            border: 1px solid #E8E8E6;
-        }
-
-        .expand-details .expand-cta {
-            display: inline-block;
-            padding: 6px 14px;
-            border-radius: 5px;
-            background: #EBF4FF;
-            color: #1d4ed8;
-            font-size: 12px;
-            font-weight: 500;
-            margin-bottom: 14px;
-        }
-
-        .expand-details .expand-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 14px;
-        }
-
-        .expand-details .expand-tag {
-            font-size: 11px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.4px;
-            padding: 2px 7px;
-            border-radius: 3px;
-            background: #F0F0EE;
-            color: #6B6B6B;
-        }
-
-        .expand-actions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #E8E8E6;
-        }
-
+        .expand-details .expand-headline { font-size: 22px; font-weight: 700; color: #1a1a1a; margin-bottom: 14px; line-height: 1.3; }
+        .expand-details .expand-primary-text { font-size: 14px; color: #6B6B6B; line-height: 1.7; margin-bottom: 16px; }
+        .expand-details .expand-description { font-size: 13px; color: #6B6B6B; line-height: 1.6; margin-bottom: 16px; padding: 10px 12px; background: #F8F8F7; border-radius: 6px; border: 1px solid #E8E8E6; }
+        .expand-details .expand-cta { display: inline-block; padding: 6px 14px; border-radius: 5px; background: #EBF4FF; color: #1d4ed8; font-size: 12px; font-weight: 500; margin-bottom: 14px; }
+        .expand-details .expand-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+        .expand-details .expand-tag { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; padding: 2px 7px; border-radius: 3px; background: #F0F0EE; color: #6B6B6B; }
+        .expand-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid #E8E8E6; }
         .expand-close {
-            position: fixed;
-            top: 16px;
-            right: 24px;
-            background: #fff;
-            border: 1px solid #E8E8E6;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6B6B6B;
-            font-size: 18px;
-            cursor: pointer;
-            z-index: 160;
-            transition: all 0.1s;
-            line-height: 1;
+            position: fixed; top: 16px; right: 24px; background: #fff; border: 1px solid #E8E8E6;
+            border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center;
+            justify-content: center; color: #6B6B6B; font-size: 18px; cursor: pointer;
+            z-index: 160; transition: all 0.1s; line-height: 1;
         }
         .expand-close:hover { color: #1a1a1a; border-color: #d0d0ce; }
     </style>
@@ -581,6 +471,20 @@
             <button class="archive-filter" data-status="rejected" onclick="setArchiveFilter('rejected')">Rejected</button>
         </span>
         <div class="toolbar-divider"></div>
+        <!-- Filter chips -->
+        <select class="filter-chip" id="filterVisualStyle" onchange="applyFilter('visual_style', this.value)">
+            <option value="">Visual style</option>
+        </select>
+        <select class="filter-chip" id="filterAspectRatio" onchange="applyFilter('aspect_ratio', this.value)">
+            <option value="">Aspect ratio</option>
+        </select>
+        <select class="filter-chip" id="filterPlatform" onchange="applyFilter('platform', this.value)">
+            <option value="">Platform</option>
+        </select>
+        <div class="toolbar-divider"></div>
+        <button onclick="collapseAll()">Collapse All</button>
+        <button onclick="expandAll()">Expand All</button>
+        <div class="toolbar-divider"></div>
         <div class="toolbar-spacer"></div>
         <button id="viewToggle" onclick="toggleViewMode()">Show Archive</button>
         <button class="voice-btn" onclick="openVoiceModal()">Voice Feedback</button>
@@ -592,7 +496,7 @@
         <div id="styleNotesContent">Loading...</div>
     </div>
 
-    <div class="gallery" id="gallery"></div>
+    <div id="galleryRoot"></div>
 
     <!-- Reject modal -->
     <div class="modal-overlay" id="rejectModal">
@@ -635,19 +539,96 @@
 
     <!-- Voice feedback modal -->
     <div class="modal-overlay" id="voiceModal">
-        <div class="modal-box" style="width: 500px;">
+        <div class="modal-box voice-modal-box">
             <h3>Voice Feedback</h3>
-            <p>Upload a recording where you reference ads by number (e.g. "Ad 2 needs more whitespace"). The transcript will be parsed and routed to the correct style notes.</p>
-            <input type="file" id="voiceFile" accept=".m4a,.mp3,.wav,.ogg,.webm" />
-            <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeVoiceModal()">Cancel</button>
-                <button class="btn-primary" onclick="submitVoiceFeedback()" id="voiceSubmitBtn">Transcribe &amp; Process</button>
+            <p>Record yourself referencing ads by number — "Ad 2 needs more whitespace, Ad 5 is too dark." The recording will be transcribed and feedback routed to each ad's style notes.</p>
+
+            <div class="recording-ui">
+                <!-- Idle -->
+                <div class="rec-idle active" id="recIdle">
+                    <div class="rec-btn-row">
+                        <button class="btn-primary" onclick="startRecording()">&#9679; Start Recording</button>
+                    </div>
+                </div>
+
+                <!-- Recording -->
+                <div class="rec-recording" id="recRecording">
+                    <div class="rec-btn-row">
+                        <span class="rec-dot"></span>
+                        <span class="rec-timer" id="recTimer">0:00</span>
+                        <div class="rec-waveform">
+                            <div class="rec-bar"></div>
+                            <div class="rec-bar"></div>
+                            <div class="rec-bar"></div>
+                            <div class="rec-bar"></div>
+                            <div class="rec-bar"></div>
+                        </div>
+                        <button class="btn-secondary" onclick="stopRecording()" style="margin-left:auto;">&#9632; Stop</button>
+                    </div>
+                </div>
+
+                <!-- Ready -->
+                <div class="rec-ready" id="recReady">
+                    <div class="rec-ready-label" id="recReadyLabel">Recording ready</div>
+                    <div class="rec-btn-row">
+                        <button class="btn-secondary" onclick="reRecord()">Re-record</button>
+                        <button class="btn-primary" onclick="submitVoiceFeedback()" id="voiceSubmitBtn">Process Feedback</button>
+                    </div>
+                </div>
+
+                <!-- Processing -->
+                <div class="rec-processing" id="recProcessing">
+                    <p style="color:#6B6B6B; font-size:13px;">Transcribing and routing feedback...</p>
+                </div>
+
+                <!-- Done -->
+                <div class="rec-done" id="recDone">
+                    <div class="rec-result active" id="recResult"></div>
+                </div>
             </div>
-            <div class="voice-result" id="voiceResult"></div>
+
+            <!-- Upload fallback -->
+            <div class="upload-fallback">
+                <label>
+                    or upload a file instead (.m4a, .mp3, .wav)
+                    <input type="file" id="voiceFile" accept=".m4a,.mp3,.wav,.ogg,.webm" onchange="handleFileUpload(this)" />
+                </label>
+            </div>
+
+            <div class="modal-actions" style="margin-top:16px;">
+                <button class="btn-cancel" onclick="closeVoiceModal()">Close</button>
+            </div>
         </div>
     </div>
 
     <div class="feedback-toast" id="feedbackToast"></div>
+
+    <!-- Deploy to Meta modal -->
+    <div class="modal-overlay" id="deployModal">
+        <div class="modal-box">
+            <h3>Deploy to Meta</h3>
+            <p>Select an Ad Set to publish this creative under. The ad will enter Meta's review queue (typically 24–48h).</p>
+
+            <label style="display:block;font-size:13px;font-weight:500;margin:14px 0 4px;">Ad Set</label>
+            <select id="deployAdsetSelect" style="width:100%;padding:7px 10px;border:1px solid #E8E8E6;border-radius:5px;font-size:13px;font-family:inherit;color:#1a1a1a;background:#fff;">
+                <option value="">Loading ad sets…</option>
+            </select>
+
+            <label style="display:block;font-size:13px;font-weight:500;margin:14px 0 4px;">Destination URL</label>
+            <input type="url" id="deployUrl" placeholder="https://jotpsych.com"
+                style="width:100%;padding:7px 10px;border:1px solid #E8E8E6;border-radius:5px;font-size:13px;font-family:inherit;" />
+
+            <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:#6B6B6B;cursor:pointer;">
+                <input type="checkbox" id="deployConfirm" />
+                I've reviewed this creative and confirm it's ready to go live on Meta
+            </label>
+
+            <div class="modal-actions" style="margin-top:18px;">
+                <button class="btn-cancel" onclick="closeDeployModal()">Cancel</button>
+                <button class="btn-primary" onclick="submitDeploy()" id="deploySubmitBtn">Deploy</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Expand overlay -->
     <div class="expand-overlay" id="expandOverlay" onclick="if(event.target===this)closeExpand()">
@@ -662,9 +643,292 @@
         const API_BASE = 'http://localhost:8000';
         let selectedIds = new Set();
         let variants = [];
-        let viewMode = 'review';  // 'review' or 'archive'
+        let briefMap = {};       // { brief_id: { raw_input, value_proposition, created_at } }
+        let viewMode = 'review'; // 'review' or 'archive'
         let archiveFilter = 'all';
-        let displayMap = {};  // { "1": "variant-uuid", ... } — built in renderGallery
+        let displayMap = {};     // { "1": "variant-uuid" } — rebuilt on every renderGallery()
+        let frozenDisplayMap = {}; // snapshot captured at openVoiceModal() time
+
+        // Filter state
+        let activeFilters = { visual_style: '', aspect_ratio: '', platform: '' };
+
+        // ---------------------------------------------------------------
+        // Data loading
+        // ---------------------------------------------------------------
+
+        async function loadReviewQueue() {
+            try {
+                const [reviewRes, briefsRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/review`),
+                    fetch(`${API_BASE}/api/briefs`),
+                ]);
+                const reviewData = await reviewRes.json();
+                const briefsData = await briefsRes.json();
+                variants = reviewData.variants;
+                briefMap = Object.fromEntries(briefsData.map(b => [b.id, b]));
+                buildFilterOptions();
+                renderGallery();
+                document.getElementById('stats').textContent = `${reviewData.count} pending`;
+            } catch (e) {
+                document.getElementById('galleryRoot').innerHTML =
+                    '<div class="empty-gallery">Cannot connect to API. Run: uvicorn dashboard.api.app:app --reload</div>';
+            }
+        }
+
+        async function loadArchive() {
+            try {
+                let archiveVariants = [];
+                if (archiveFilter === 'all') {
+                    const [approvedRes, rejectedRes] = await Promise.all([
+                        fetch(`${API_BASE}/api/variants?status=approved`),
+                        fetch(`${API_BASE}/api/variants?status=rejected`),
+                    ]);
+                    const a = await approvedRes.json();
+                    const r = await rejectedRes.json();
+                    archiveVariants = [...a.variants, ...r.variants];
+                    archiveVariants.sort((a, b) => (b.reviewed_at || '').localeCompare(a.reviewed_at || ''));
+                } else {
+                    const res = await fetch(`${API_BASE}/api/variants?status=${archiveFilter}`);
+                    const data = await res.json();
+                    archiveVariants = data.variants;
+                }
+
+                const briefsRes = await fetch(`${API_BASE}/api/briefs`);
+                const briefsData = await briefsRes.json();
+                variants = archiveVariants;
+                briefMap = Object.fromEntries(briefsData.map(b => [b.id, b]));
+                buildFilterOptions();
+                renderGallery();
+                document.getElementById('stats').textContent = `${variants.length} variants`;
+            } catch (e) {
+                document.getElementById('galleryRoot').innerHTML = '<div class="empty-gallery">Cannot connect to API.</div>';
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Filter chip population
+        // ---------------------------------------------------------------
+
+        function buildFilterOptions() {
+            const visualStyles = [...new Set(variants.map(v => v.taxonomy?.visual_style).filter(Boolean))].sort();
+            const ratios       = [...new Set(variants.map(v => v.taxonomy?.aspect_ratio).filter(Boolean))].sort();
+            const platforms    = [...new Set(variants.map(v => v.taxonomy?.platform).filter(Boolean))].sort();
+
+            populateSelect('filterVisualStyle', 'Visual style', visualStyles, activeFilters.visual_style);
+            populateSelect('filterAspectRatio', 'Aspect ratio', ratios, activeFilters.aspect_ratio);
+            populateSelect('filterPlatform',    'Platform',     platforms, activeFilters.platform);
+        }
+
+        function populateSelect(id, placeholder, values, current) {
+            const sel = document.getElementById(id);
+            sel.innerHTML = `<option value="">${placeholder}</option>` +
+                values.map(v => `<option value="${v}" ${v === current ? 'selected' : ''}>${v}</option>`).join('');
+            sel.classList.toggle('active', !!current);
+        }
+
+        function applyFilter(key, value) {
+            activeFilters[key] = value;
+            document.getElementById(
+                key === 'visual_style' ? 'filterVisualStyle' :
+                key === 'aspect_ratio' ? 'filterAspectRatio' : 'filterPlatform'
+            ).classList.toggle('active', !!value);
+            renderGallery();
+        }
+
+        // ---------------------------------------------------------------
+        // Gallery rendering — grouped by brief
+        // ---------------------------------------------------------------
+
+        function getFiltered() {
+            return variants.filter(v => {
+                const tax = v.taxonomy || {};
+                if (activeFilters.visual_style && tax.visual_style !== activeFilters.visual_style) return false;
+                if (activeFilters.aspect_ratio && tax.aspect_ratio !== activeFilters.aspect_ratio) return false;
+                if (activeFilters.platform && tax.platform !== activeFilters.platform) return false;
+                return true;
+            });
+        }
+
+        function groupByBrief(filtered) {
+            // Group variants by brief_id
+            const groups = {};
+            filtered.forEach(v => {
+                if (!groups[v.brief_id]) groups[v.brief_id] = [];
+                groups[v.brief_id].push(v);
+            });
+
+            // Sort groups by brief created_at descending (newest first)
+            // Briefs not in briefMap fall back to oldest
+            return Object.entries(groups).sort(([aId], [bId]) => {
+                const aDate = briefMap[aId]?.created_at || '';
+                const bDate = briefMap[bId]?.created_at || '';
+                return bDate.localeCompare(aDate);
+            });
+        }
+
+        function renderGallery() {
+            const root = document.getElementById('galleryRoot');
+            displayMap = {};
+
+            const filtered = getFiltered();
+            if (!filtered.length) {
+                const msg = variants.length
+                    ? 'No ads match the current filters.'
+                    : viewMode === 'archive'
+                        ? 'No variants found.'
+                        : 'No variants pending review. Submit an idea to get started.';
+                root.innerHTML = `<div class="empty-gallery">${msg}</div>`;
+                return;
+            }
+
+            const groups = groupByBrief(filtered);
+            let displayNum = 1;
+            let html = '';
+
+            groups.forEach(([briefId, groupVariants]) => {
+                const brief = briefMap[briefId];
+                const fullConcept = brief
+                    ? (brief.raw_input || brief.value_proposition || 'Unknown brief')
+                    : briefId.slice(0, 8) + '…';
+                const concept = fullConcept.slice(0, 80) + (fullConcept.length > 80 ? '…' : '');
+                const dateStr = brief
+                    ? new Date(brief.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                    : '';
+
+                // Archive status summary
+                let metaSuffix = '';
+                if (viewMode === 'archive') {
+                    const approved = groupVariants.filter(v => v.status === 'approved').length;
+                    const rejected = groupVariants.filter(v => v.status === 'rejected').length;
+                    const parts = [];
+                    if (approved) parts.push(`${approved} approved`);
+                    if (rejected) parts.push(`${rejected} rejected`);
+                    metaSuffix = parts.length ? ` · ${parts.join(', ')}` : '';
+                }
+
+                const uniqueStyles = [...new Set(groupVariants.map(v => v.taxonomy?.visual_style).filter(Boolean))];
+                const uniqueRatios = [...new Set(groupVariants.map(v => v.taxonomy?.aspect_ratio).filter(Boolean))];
+                const tagsHtml = [
+                    ...uniqueStyles.map(s => `<span class="brief-tag">${escapeHtml(s.replace(/_/g, ' '))}</span>`),
+                    ...uniqueRatios.map(r => `<span class="brief-tag ratio">${escapeHtml(r)}</span>`),
+                ].join('');
+
+                const groupActionBtns = viewMode === 'review' ? `
+                        <button class="brief-action-btn approve" onclick="event.stopPropagation(); approveBriefGroup('${briefId}')">✓ Approve all</button>
+                        <button class="brief-action-btn reject"  onclick="event.stopPropagation(); rejectBriefGroup('${briefId}')">✕ Reject all</button>
+                        <span class="brief-header-divider"></span>` : '';
+
+                html += `<div class="brief-group" id="group-${briefId}">
+                    <div class="brief-header" onclick="toggleBriefGroup('${briefId}')">
+                        <span class="brief-concept" data-tooltip="${escapeAttr(fullConcept)}">${escapeHtml(concept)}</span>
+                        <div class="brief-header-right">
+                            ${groupActionBtns}
+                            <div class="brief-tags">${tagsHtml}</div>
+                            <span class="brief-meta">${groupVariants.length} variant${groupVariants.length !== 1 ? 's' : ''}${metaSuffix}${dateStr ? ' · ' + dateStr : ''}</span>
+                            <span class="brief-collapse-icon">▾</span>
+                        </div>
+                    </div>
+                    <div class="gallery-section">`;
+
+                groupVariants.forEach(v => {
+                    displayMap[String(displayNum)] = v.id;
+
+                    const statusBadge = viewMode === 'archive'
+                        ? `<span class="status-badge ${v.status}">${v.status}</span>` : '';
+                    const cardMetaBadge = v.meta_review_status
+                        ? (() => {
+                            const label = v.meta_review_status === 'pending_review' ? 'Meta: Pending'
+                                        : v.meta_review_status === 'active' ? 'Meta: Live' : 'Meta: Rejected';
+                            const cls = v.meta_review_status === 'active' ? 'active'
+                                      : v.meta_review_status === 'disapproved' ? 'disapproved' : 'pending';
+                            const tip = (v.meta_rejection_reasons || []).join(', ');
+                            return `<span class="meta-badge ${cls}" title="${escapeAttr(tip)}">${label}</span>`;
+                          })()
+                        : '';
+                    const reviewInfo = viewMode === 'archive' && v.reviewed_at
+                        ? `<div class="review-info">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</div>` : '';
+                    const reviewNotes = viewMode === 'archive' && v.review_notes
+                        ? `<div class="review-info" style="margin-top:2px;">"${escapeHtml(v.review_notes)}"</div>` : '';
+
+                    html += `
+                    <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}"
+                         onclick="toggleSelect('${v.id}')"
+                         ondblclick="event.stopPropagation(); expandVariant('${v.id}')">
+                        <div class="asset ${ratioClass(v)}">
+                            <span class="card-number">#${displayNum}</span>
+                            ${getAssetHtml(v)}
+                        </div>
+                        <div class="content">
+                            <div class="headline">${escapeHtml(v.headline)}</div>
+                            <div class="primary-text">${escapeHtml(v.primary_text)}</div>
+                            <div class="tags">
+                                <span class="tag">${v.taxonomy.message_type}</span>
+                                <span class="tag">${v.taxonomy.hook_type}</span>
+                                <span class="tag">${v.taxonomy.tone}</span>
+                                <span class="tag">${v.taxonomy.platform}</span>
+                            </div>
+                            ${statusBadge}${cardMetaBadge}${reviewInfo}${reviewNotes}
+                            <div class="card-actions">
+                                <span class="cta-label">${escapeHtml(v.cta_button)}</span>
+                                <button class="action-link like" onclick="event.stopPropagation(); openLikeModal('${v.id}')">Like</button>
+                                <button class="action-link feedback" onclick="event.stopPropagation(); openFeedbackModal('${v.id}')">Feedback</button>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    displayNum++;
+                });
+
+                html += `</div></div>`;
+            });
+
+            root.innerHTML = html;
+        }
+
+        function toggleBriefGroup(briefId) {
+            document.getElementById(`group-${briefId}`)?.classList.toggle('collapsed');
+        }
+
+        function approveBriefGroup(briefId) {
+            const ids = variants.filter(v => v.brief_id === briefId).map(v => v.id);
+            selectedIds.clear();
+            ids.forEach(id => selectedIds.add(id));
+            approveSelected();
+        }
+
+        function rejectBriefGroup(briefId) {
+            const ids = variants.filter(v => v.brief_id === briefId).map(v => v.id);
+            selectedIds.clear();
+            ids.forEach(id => selectedIds.add(id));
+            showRejectModal();
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.brief-group').forEach(g => g.classList.add('collapsed'));
+        }
+
+        function expandAll() {
+            document.querySelectorAll('.brief-group').forEach(g => g.classList.remove('collapsed'));
+        }
+
+        function ratioClass(v) {
+            const r = v.taxonomy?.aspect_ratio;
+            if (r === '9:16') return 'ratio-9x16';
+            if (r === '4:5')  return 'ratio-4x5';
+            return 'ratio-1x1';
+        }
+
+        function getAssetHtml(v) {
+            if (v.asset_path && v.asset_path.endsWith('.png')) {
+                const url = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
+                return `<img src="${url}" alt="${escapeHtml(v.headline)}" />`;
+            }
+            return v.asset_type === 'video' ? '▶ Video' : 'No image';
+        }
+
+        // ---------------------------------------------------------------
+        // View mode toggle
+        // ---------------------------------------------------------------
 
         function toggleViewMode() {
             viewMode = viewMode === 'review' ? 'archive' : 'review';
@@ -698,96 +962,9 @@
             loadArchive();
         }
 
-        async function loadArchive() {
-            try {
-                if (archiveFilter === 'all') {
-                    const [approvedRes, rejectedRes] = await Promise.all([
-                        fetch(`${API_BASE}/api/variants?status=approved`),
-                        fetch(`${API_BASE}/api/variants?status=rejected`),
-                    ]);
-                    const approved = await approvedRes.json();
-                    const rejected = await rejectedRes.json();
-                    variants = [...approved.variants, ...rejected.variants];
-                    variants.sort((a, b) => (b.reviewed_at || '').localeCompare(a.reviewed_at || ''));
-                } else {
-                    const res = await fetch(`${API_BASE}/api/variants?status=${archiveFilter}`);
-                    const data = await res.json();
-                    variants = data.variants;
-                }
-                renderGallery();
-                document.getElementById('stats').textContent = `${variants.length} variants`;
-            } catch (e) {
-                document.getElementById('gallery').innerHTML = '<div class="empty-state">Cannot connect to API.</div>';
-            }
-        }
-
-        async function loadReviewQueue() {
-            try {
-                const res = await fetch(`${API_BASE}/api/review`);
-                const data = await res.json();
-                variants = data.variants;
-                renderGallery();
-                document.getElementById('stats').textContent = `${data.count} pending`;
-            } catch (e) {
-                document.getElementById('gallery').innerHTML = '<div class="empty-state">Cannot connect to API. Run: uvicorn dashboard.api.app:app --reload</div>';
-            }
-        }
-
-        function ratioClass(v) {
-            const r = v.taxonomy && v.taxonomy.aspect_ratio;
-            if (r === '9:16') return 'ratio-9x16';
-            if (r === '4:5')  return 'ratio-4x5';
-            return 'ratio-1x1';
-        }
-
-        function renderGallery() {
-            const gallery = document.getElementById('gallery');
-            displayMap = {};
-
-            if (!variants.length) {
-                const msg = viewMode === 'archive'
-                    ? 'No variants found.'
-                    : 'No variants pending review. Submit an idea to get started.';
-                gallery.innerHTML = `<div class="empty-state">${msg}</div>`;
-                return;
-            }
-
-            gallery.innerHTML = variants.map((v, idx) => {
-                const displayNum = idx + 1;
-                displayMap[String(displayNum)] = v.id;
-
-                const statusBadge = viewMode === 'archive'
-                    ? `<span class="status-badge ${v.status}">${v.status}</span>` : '';
-                const reviewInfo = viewMode === 'archive' && v.reviewed_at
-                    ? `<div class="review-info">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</div>` : '';
-                const reviewNotes = viewMode === 'archive' && v.review_notes
-                    ? `<div class="review-info" style="margin-top:2px;">"${escapeHtml(v.review_notes)}"</div>` : '';
-
-                return `
-                <div class="card ${selectedIds.has(v.id) ? 'selected' : ''}" onclick="toggleSelect('${v.id}')" ondblclick="event.stopPropagation(); expandVariant('${v.id}')">
-                    <div class="asset ${ratioClass(v)}">
-                        <span class="card-number">#${displayNum}</span>
-                        ${getAssetHtml(v)}
-                    </div>
-                    <div class="content">
-                        <div class="headline">${escapeHtml(v.headline)}</div>
-                        <div class="primary-text">${escapeHtml(v.primary_text)}</div>
-                        <div class="tags">
-                            <span class="tag">${v.taxonomy.message_type}</span>
-                            <span class="tag">${v.taxonomy.hook_type}</span>
-                            <span class="tag">${v.taxonomy.tone}</span>
-                            <span class="tag">${v.taxonomy.platform}</span>
-                        </div>
-                        ${statusBadge}${reviewInfo}${reviewNotes}
-                        <div class="card-actions">
-                            <span class="cta-label">${escapeHtml(v.cta_button)}</span>
-                            <button class="action-link like" onclick="event.stopPropagation(); openLikeModal('${v.id}')">Like</button>
-                            <button class="action-link feedback" onclick="event.stopPropagation(); openFeedbackModal('${v.id}')">Feedback</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
+        // ---------------------------------------------------------------
+        // Selection
+        // ---------------------------------------------------------------
 
         function toggleSelect(id) {
             if (selectedIds.has(id)) selectedIds.delete(id);
@@ -796,7 +973,7 @@
         }
 
         function selectAll() {
-            variants.forEach(v => selectedIds.add(v.id));
+            getFiltered().forEach(v => selectedIds.add(v.id));
             renderGallery();
         }
 
@@ -805,11 +982,14 @@
             renderGallery();
         }
 
+        // ---------------------------------------------------------------
+        // Approve / Reject
+        // ---------------------------------------------------------------
+
         async function approveSelected() {
             if (!selectedIds.size) return;
             await fetch(`${API_BASE}/api/review/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate' }),
             });
             selectedIds.clear();
@@ -820,7 +1000,6 @@
             if (!selectedIds.size) return;
             document.getElementById('rejectModal').classList.add('active');
         }
-
         function closeRejectModal() {
             document.getElementById('rejectModal').classList.remove('active');
             document.getElementById('rejectNotes').value = '';
@@ -831,35 +1010,21 @@
             if (!notes.trim()) { showToast('Please enter rejection feedback'); return; }
             try {
                 const res = await fetch(`${API_BASE}/api/review/reject`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate', notes }),
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate', notes, display_map: displayMap }),
                 });
                 const data = await res.json();
                 closeRejectModal();
                 selectedIds.clear();
-                showToast(`Rejected ${data.rejected} variant(s)`);
+                const routingNote = data.feedback_routing === 'per_ad' ? ` (routed to ${data.per_ad_feedback?.length || 0} ads)` : '';
+                showToast(`Rejected ${data.rejected} variant(s)${routingNote}`);
                 viewMode === 'archive' ? loadArchive() : loadReviewQueue();
-            } catch (e) {
-                showToast('Error rejecting variants: ' + e.message);
-            }
+            } catch (e) { showToast('Error rejecting variants'); }
         }
 
-        function getAssetHtml(v) {
-            if (v.asset_path && v.asset_path.endsWith('.png')) {
-                const assetUrl = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
-                return `<img src="${assetUrl}" alt="${escapeHtml(v.headline)}" />`;
-            }
-            return v.asset_type === 'video' ? '▶ Video' : 'No image';
-        }
-
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str || '';
-            return div.innerHTML;
-        }
-
-        // --- Image Feedback ---
+        // ---------------------------------------------------------------
+        // Image Feedback
+        // ---------------------------------------------------------------
 
         let feedbackVariantId = null;
 
@@ -869,7 +1034,6 @@
             document.getElementById('feedbackModal').classList.add('active');
             document.getElementById('feedbackText').focus();
         }
-
         function closeFeedbackModal() {
             document.getElementById('feedbackModal').classList.remove('active');
             feedbackVariantId = null;
@@ -878,31 +1042,25 @@
         async function submitFeedback() {
             const feedback = document.getElementById('feedbackText').value.trim();
             if (!feedback) return;
-
             const btn = document.getElementById('feedbackSubmitBtn');
-            btn.textContent = 'Processing...';
-            btn.disabled = true;
-
+            btn.textContent = 'Processing...'; btn.disabled = true;
             try {
                 const res = await fetch(`${API_BASE}/api/feedback/image`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ variant_id: feedbackVariantId, feedback }),
                 });
                 const data = await res.json();
                 closeFeedbackModal();
-                const fileLabel = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
-                showToast(`Feedback processed → ${fileLabel} updated`);
+                const label = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
+                showToast(`Feedback processed → ${label} updated`);
                 if (document.getElementById('styleNotesPanel').classList.contains('active')) loadStyleNotes();
-            } catch (e) {
-                showToast('Error submitting feedback');
-            } finally {
-                btn.textContent = 'Submit Feedback';
-                btn.disabled = false;
-            }
+            } catch (e) { showToast('Error submitting feedback'); }
+            finally { btn.textContent = 'Submit Feedback'; btn.disabled = false; }
         }
 
-        // --- Like Style ---
+        // ---------------------------------------------------------------
+        // Like
+        // ---------------------------------------------------------------
 
         let likeVariantId = null;
 
@@ -912,7 +1070,6 @@
             document.getElementById('likeModal').classList.add('active');
             document.getElementById('likeNote').focus();
         }
-
         function closeLikeModal() {
             document.getElementById('likeModal').classList.remove('active');
             likeVariantId = null;
@@ -921,85 +1078,162 @@
         async function submitLike() {
             const note = document.getElementById('likeNote').value.trim();
             const btn = document.getElementById('likeSubmitBtn');
-            btn.textContent = 'Saving...';
-            btn.disabled = true;
-
+            btn.textContent = 'Saving...'; btn.disabled = true;
             try {
                 const res = await fetch(`${API_BASE}/api/feedback/like`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ variant_id: likeVariantId, note: note || null }),
                 });
                 const data = await res.json();
                 closeLikeModal();
-                const fileLabel = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
-                showToast(`Liked — saved as ${fileLabel} reference`);
+                const label = data.notes_file ? data.notes_file.replace('style_notes_', '').replace('.md', '') : 'style';
+                showToast(`Liked — saved as ${label} reference`);
                 if (document.getElementById('styleNotesPanel').classList.contains('active')) loadStyleNotes();
-            } catch (e) {
-                showToast('Error saving liked image');
-            } finally {
-                btn.textContent = 'Save as Reference';
-                btn.disabled = false;
-            }
+            } catch (e) { showToast('Error saving liked image'); }
+            finally { btn.textContent = 'Save as Reference'; btn.disabled = false; }
         }
 
-        // --- Voice Feedback ---
+        // ---------------------------------------------------------------
+        // Voice Feedback — MediaRecorder
+        // ---------------------------------------------------------------
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let pendingAudioBlob = null;
+        let recordingTimerInterval = null;
+        let recordingSeconds = 0;
+
+        function setRecState(state) {
+            ['recIdle','recRecording','recReady','recProcessing','recDone'].forEach(id => {
+                document.getElementById(id).classList.remove('active');
+            });
+            document.getElementById('rec' + state).classList.add('active');
+        }
 
         function openVoiceModal() {
+            // Freeze displayMap at the moment the user opens the modal —
+            // numbers they reference in their recording match what they see right now.
+            frozenDisplayMap = { ...displayMap };
+
+            pendingAudioBlob = null;
+            audioChunks = [];
+            document.getElementById('recResult').innerHTML = '';
+            document.getElementById('recResult').classList.remove('active');
             document.getElementById('voiceFile').value = '';
-            document.getElementById('voiceResult').classList.remove('active');
-            document.getElementById('voiceResult').innerHTML = '';
+            setRecState('Idle');
             document.getElementById('voiceModal').classList.add('active');
         }
 
         function closeVoiceModal() {
+            stopRecording();
             document.getElementById('voiceModal').classList.remove('active');
         }
 
-        async function submitVoiceFeedback() {
-            const fileInput = document.getElementById('voiceFile');
-            if (!fileInput.files.length) { showToast('Please select an audio file'); return; }
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+                mediaRecorder = new MediaRecorder(stream, { mimeType });
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = () => {
+                    pendingAudioBlob = new Blob(audioChunks, { type: mimeType });
+                    stream.getTracks().forEach(t => t.stop());
+                    clearInterval(recordingTimerInterval);
+                    document.getElementById('recReadyLabel').textContent =
+                        `Recording ready (${formatDuration(recordingSeconds)})`;
+                    setRecState('Ready');
+                };
+                mediaRecorder.start(100); // collect in 100ms chunks
+                recordingSeconds = 0;
+                updateTimer();
+                recordingTimerInterval = setInterval(() => {
+                    recordingSeconds++;
+                    updateTimer();
+                }, 1000);
+                setRecState('Recording');
+            } catch (err) {
+                showToast('Microphone access denied — use file upload instead');
+            }
+        }
 
-            const btn = document.getElementById('voiceSubmitBtn');
-            btn.textContent = 'Transcribing...';
-            btn.disabled = true;
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            clearInterval(recordingTimerInterval);
+        }
+
+        function reRecord() {
+            pendingAudioBlob = null;
+            audioChunks = [];
+            recordingSeconds = 0;
+            setRecState('Idle');
+        }
+
+        function updateTimer() {
+            document.getElementById('recTimer').textContent = formatDuration(recordingSeconds);
+        }
+
+        function formatDuration(secs) {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        function handleFileUpload(input) {
+            if (input.files.length) {
+                pendingAudioBlob = input.files[0];
+                document.getElementById('recReadyLabel').textContent =
+                    `File ready: ${input.files[0].name}`;
+                setRecState('Ready');
+            }
+        }
+
+        async function submitVoiceFeedback() {
+            if (!pendingAudioBlob) { showToast('No recording to submit'); return; }
+
+            setRecState('Processing');
 
             const formData = new FormData();
-            formData.append('audio', fileInput.files[0]);
-            formData.append('display_map', JSON.stringify(displayMap));
+            const ext = pendingAudioBlob.type.includes('ogg') ? '.ogg' : '.webm';
+            formData.append('audio', pendingAudioBlob, `recording${ext}`);
+            // Use the frozen displayMap — captured at modal open time
+            formData.append('display_map', JSON.stringify(frozenDisplayMap));
 
             try {
                 const res = await fetch(`${API_BASE}/api/feedback/voice`, {
-                    method: 'POST',
-                    body: formData,
+                    method: 'POST', body: formData,
                 });
                 const data = await res.json();
 
-                const resultEl = document.getElementById('voiceResult');
                 let html = `<strong>Transcript:</strong> ${escapeHtml(data.transcript)}<br><br>`;
-                if (data.feedback_processed && data.feedback_processed.length) {
+                if (data.feedback_processed?.length) {
                     html += `<strong>Processed:</strong><br>`;
                     data.feedback_processed.forEach(p => {
-                        const fileLabel = p.notes_file.replace('style_notes_', '').replace('.md', '');
-                        html += `· Ad #${p.ad_number} → ${fileLabel}<br>`;
+                        const label = p.notes_file.replace('style_notes_', '').replace('.md', '');
+                        html += `· Ad #${p.ad_number} → ${label}<br>`;
                     });
                 } else {
                     html += '<strong>No ad numbers found in transcript.</strong>';
                 }
+
+                const resultEl = document.getElementById('recResult');
                 resultEl.innerHTML = html;
                 resultEl.classList.add('active');
+                setRecState('Done');
 
-                showToast(`Voice feedback processed — ${(data.feedback_processed || []).length} ads updated`);
+                showToast(`Voice feedback — ${(data.feedback_processed || []).length} ads updated`);
                 if (document.getElementById('styleNotesPanel').classList.contains('active')) loadStyleNotes();
             } catch (e) {
                 showToast('Error processing voice feedback');
-            } finally {
-                btn.textContent = 'Transcribe & Process';
-                btn.disabled = false;
+                setRecState('Ready');
             }
         }
 
-        // --- Style Notes Panel ---
+        // ---------------------------------------------------------------
+        // Style Notes Panel
+        // ---------------------------------------------------------------
 
         async function toggleStyleNotes() {
             const panel = document.getElementById('styleNotesPanel');
@@ -1025,7 +1259,8 @@
                     illustration_1x1: 'Illustration · 1:1', illustration_4x5: 'Illustration · 4:5', illustration_9x16: 'Illustration · 9:16',
                     graphic_1x1: 'Graphic · 1:1', graphic_4x5: 'Graphic · 4:5', graphic_9x16: 'Graphic · 9:16',
                 };
-                container.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">' +
+                container.innerHTML =
+                    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;">' +
                     Object.entries(data).map(([key, notes]) => `
                     <div>
                         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#9B9B9B;margin-bottom:8px;">${labels[key] || key}</div>
@@ -1033,11 +1268,14 @@
                     </div>`).join('') +
                     '</div>';
             } catch (e) {
-                document.getElementById('styleNotesContent').innerHTML = '<p style="color:#9B9B9B;font-size:13px;">Could not load style notes.</p>';
+                document.getElementById('styleNotesContent').innerHTML =
+                    '<p style="color:#9B9B9B;font-size:13px;">Could not load style notes.</p>';
             }
         }
 
-        // --- Expand View ---
+        // ---------------------------------------------------------------
+        // Expand View
+        // ---------------------------------------------------------------
 
         function expandVariant(id) {
             const v = variants.find(x => x.id === id);
@@ -1045,24 +1283,49 @@
 
             const imageContainer = document.getElementById('expandImage');
             if (v.asset_path && v.asset_path.endsWith('.png')) {
-                const assetUrl = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
-                imageContainer.innerHTML = `<img src="${assetUrl}" alt="${escapeHtml(v.headline)}" onclick="this.classList.toggle('zoomed')" />`;
+                const url = API_BASE + '/assets/' + v.asset_path.replace('data/creatives/', '');
+                imageContainer.innerHTML = `<img src="${url}" alt="${escapeHtml(v.headline)}" onclick="this.classList.toggle('zoomed')" />`;
             } else {
                 imageContainer.innerHTML = '<div style="color:#C0C0BE;padding:40px;font-size:13px;">No image</div>';
             }
 
-            const allTags = v.taxonomy ? Object.entries(v.taxonomy)
-                .filter(([, val]) => typeof val === 'string' || typeof val === 'boolean' || typeof val === 'number')
-                .map(([k, val]) => `<span class="expand-tag">${k}: ${val}</span>`)
-                .join('') : '';
+            const allTags = v.taxonomy
+                ? Object.entries(v.taxonomy)
+                    .filter(([, val]) => typeof val === 'string' || typeof val === 'boolean' || typeof val === 'number')
+                    .map(([k, val]) => `<span class="expand-tag">${k}: ${val}</span>`).join('')
+                : '';
 
             const reviewActions = `
                 <button onclick="closeExpand(); selectedIds.add('${v.id}'); renderGallery(); showRejectModal()" class="btn-danger">Reject</button>
                 <button onclick="closeExpand(); approveOne('${v.id}')" class="btn-primary">Approve</button>`;
+            const deployBtn = v.status === 'approved'
+                ? `<button onclick="event.stopPropagation(); openDeployModal('${v.id}')"
+                       style="padding:7px 14px;background:#EBF4FF;border:1px solid #BFDBFE;border-radius:5px;color:#1d4ed8;cursor:pointer;font-size:13px;font-family:inherit;">
+                       Deploy to Meta
+                   </button>` : '';
             const archiveActions = `
+                ${deployBtn}
                 <button onclick="closeExpand(); returnToReview('${v.id}')" class="btn-primary">Return to Review</button>`;
+
+            const metaBadge = v.meta_review_status
+                ? (() => {
+                    const label = v.meta_review_status === 'pending_review' ? 'Meta: Pending Review'
+                                : v.meta_review_status === 'active' ? 'Meta: Live'
+                                : 'Meta: Rejected';
+                    const cls = v.meta_review_status === 'active' ? 'active'
+                              : v.meta_review_status === 'disapproved' ? 'disapproved' : 'pending';
+                    const title = (v.meta_rejection_reasons || []).join(', ');
+                    return `<span class="meta-badge ${cls}" title="${escapeAttr(title)}">${label}</span>`;
+                  })()
+                : '';
+
             const statusInfo = viewMode === 'archive'
-                ? `<div style="margin-top:12px;"><span class="status-badge ${v.status}">${v.status}</span>${v.reviewed_at ? `<span style="color:#9B9B9B;font-size:12px;margin-left:8px;">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</span>` : ''}${v.review_notes ? `<div style="color:#6B6B6B;font-size:12px;margin-top:6px;">"${escapeHtml(v.review_notes)}"</div>` : ''}</div>` : '';
+                ? `<div style="margin-top:12px;">
+                    <span class="status-badge ${v.status}">${v.status}</span>
+                    ${metaBadge}
+                    ${v.reviewed_at ? `<span style="color:#9B9B9B;font-size:12px;margin-left:8px;">${v.reviewer || ''} · ${new Date(v.reviewed_at).toLocaleDateString()}</span>` : ''}
+                    ${v.review_notes ? `<div style="color:#6B6B6B;font-size:12px;margin-top:6px;">"${escapeHtml(v.review_notes)}"</div>` : ''}
+                   </div>` : '';
 
             document.getElementById('expandDetails').innerHTML = `
                 <div class="expand-headline">${escapeHtml(v.headline)}</div>
@@ -1073,11 +1336,11 @@
                 ${statusInfo}
                 <div class="expand-actions">
                     <button onclick="event.stopPropagation(); closeExpand(); openLikeModal('${v.id}')" class="btn-positive">Like Style</button>
-                    <button onclick="event.stopPropagation(); closeExpand(); openFeedbackModal('${v.id}')" style="padding:7px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;color:#92400e;cursor:pointer;font-size:13px;">Feedback</button>
+                    <button onclick="event.stopPropagation(); closeExpand(); openFeedbackModal('${v.id}')"
+                        style="padding:7px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:5px;color:#92400e;cursor:pointer;font-size:13px;">Feedback</button>
                     ${viewMode === 'archive' ? archiveActions : reviewActions}
                 </div>
             `;
-
             document.getElementById('expandOverlay').classList.add('active');
         }
 
@@ -1089,35 +1352,108 @@
 
         async function returnToReview(id) {
             await fetch(`${API_BASE}/api/review/return-to-review`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
             });
             showToast('Returned to review queue');
             loadArchive();
         }
 
+        // ---------------------------------------------------------------
+        // Deploy to Meta
+        // ---------------------------------------------------------------
+
+        let deployVariantId = null;
+
+        async function openDeployModal(variantId) {
+            deployVariantId = variantId;
+            document.getElementById('deployConfirm').checked = false;
+            document.getElementById('deployUrl').value = '';
+            document.getElementById('deploySubmitBtn').disabled = false;
+            document.getElementById('deploySubmitBtn').textContent = 'Deploy';
+
+            // Load adsets into the select
+            const sel = document.getElementById('deployAdsetSelect');
+            sel.innerHTML = '<option value="">Loading…</option>';
+            try {
+                const res = await fetch(`${API_BASE}/api/meta/adsets`);
+                const data = await res.json();
+                const adsets = data.adsets || [];
+                if (!adsets.length) {
+                    sel.innerHTML = '<option value="">No active ad sets found</option>';
+                } else {
+                    sel.innerHTML = adsets.map(a =>
+                        `<option value="${a.id}">${escapeHtml(a.name)}${a.daily_budget_cents ? ' · $' + (a.daily_budget_cents / 100).toFixed(0) + '/day' : ''}</option>`
+                    ).join('');
+                }
+            } catch {
+                sel.innerHTML = '<option value="">Error loading ad sets</option>';
+            }
+
+            document.getElementById('deployModal').classList.add('active');
+        }
+
+        function closeDeployModal() {
+            document.getElementById('deployModal').classList.remove('active');
+            deployVariantId = null;
+        }
+
+        async function submitDeploy() {
+            if (!deployVariantId) return;
+            if (!document.getElementById('deployConfirm').checked) {
+                showToast('Please confirm the creative is ready to go live');
+                return;
+            }
+            const adsetId = document.getElementById('deployAdsetSelect').value;
+            if (!adsetId) { showToast('Please select an ad set'); return; }
+            const url = document.getElementById('deployUrl').value.trim() || null;
+
+            const btn = document.getElementById('deploySubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Deploying…';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ variant_id: deployVariantId, adset_id: adsetId, destination_url: url }),
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Deploy failed');
+                }
+                const data = await res.json();
+                closeDeployModal();
+                showToast(`Submitted to Meta for review — Ad ID: ${data.meta_ad_id}`);
+                loadArchive();
+            } catch (e) {
+                showToast(`Deploy error: ${e.message}`);
+                btn.disabled = false;
+                btn.textContent = 'Deploy';
+            }
+        }
+
         async function approveOne(id) {
             await fetch(`${API_BASE}/api/review/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
             });
             viewMode === 'archive' ? loadArchive() : loadReviewQueue();
         }
 
-        // Close modals on Escape
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeExpand();
-                closeRejectModal();
-                closeFeedbackModal();
-                closeLikeModal();
-                closeVoiceModal();
-            }
-        });
+        // ---------------------------------------------------------------
+        // Utilities
+        // ---------------------------------------------------------------
 
-        // --- Toast ---
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        function escapeAttr(str) {
+            return (str || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         function showToast(msg) {
             const toast = document.getElementById('feedbackToast');
@@ -1125,6 +1461,17 @@
             toast.style.display = 'block';
             setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeExpand();
+                closeRejectModal();
+                closeFeedbackModal();
+                closeLikeModal();
+                closeVoiceModal();
+                closeDeployModal();
+            }
+        });
 
         loadReviewQueue();
     </script>
