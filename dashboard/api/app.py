@@ -108,6 +108,13 @@ class ExportRequest(BaseModel):
     display_map: dict[str, str]  # { "1": "variant-uuid", ... }
 
 
+class CopyUpdate(BaseModel):
+    headline: Optional[str] = None
+    primary_text: Optional[str] = None
+    description: Optional[str] = None
+    cta_button: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Intake
 # ---------------------------------------------------------------------------
@@ -583,6 +590,32 @@ async def list_variants(status: Optional[str] = None):
         "count": len(variants),
         "variants": [v.model_dump() for v in variants],
     }
+
+
+@app.patch("/api/variants/{variant_id}")
+async def update_variant_copy(variant_id: str, update: CopyUpdate):
+    """Update editable copy fields on a variant (headline, primary_text, description, cta_button).
+
+    Only fields included in the request body are changed — omitted fields are untouched.
+    Rejects blank strings for required fields (headline, primary_text, cta_button).
+    """
+    try:
+        variant = store.get_variant(variant_id)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    changed: dict[str, str] = {}
+    for field, value in update.model_dump(exclude_none=True).items():
+        if field != "description" and not value.strip():
+            raise HTTPException(status_code=400, detail=f"'{field}' cannot be empty")
+        setattr(variant, field, value.strip() if value else value)
+        changed[field] = value
+
+    if not changed:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
+
+    store.save_variant(variant)
+    return {"updated": changed, "variant": variant.model_dump()}
 
 
 @app.get("/api/briefs")
