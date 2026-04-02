@@ -453,38 +453,39 @@
             border-radius: 10px; padding: 24px; border: 1px solid #E8E8E6;
         }
         /* ---- Editable copy fields ---- */
-        .copy-field-wrap { position: relative; margin-bottom: 14px; }
+        .copy-field-wrap { position: relative; margin-bottom: 18px; }
         .copy-field-label {
             font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-            color: #B0B0AE; margin-bottom: 4px;
+            color: #B0B0AE; margin-bottom: 5px; display: block;
         }
         .copy-field {
-            display: block; width: 100%; background: transparent; border: 1px solid transparent;
-            border-radius: 6px; cursor: text; transition: border-color 0.15s, background 0.15s;
-            outline: none; font-family: inherit; resize: none; overflow: hidden;
+            display: block; width: 100%; box-sizing: border-box;
+            border: 1px solid #E8E8E6; border-radius: 6px;
+            background: #FAFAF9; color: #1a1a1a;
+            font-family: inherit; resize: none; overflow: hidden;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+            outline: none; cursor: text;
         }
-        .copy-field:hover { border-color: #E0E0DE; background: #FAFAF9; }
+        .copy-field:hover { border-color: #C8C8C6; background: #F5F5F3; }
         .copy-field:focus { border-color: #1C1E85; background: #fff;
-                            box-shadow: 0 0 0 3px rgba(28,30,133,0.08); cursor: text; }
+                            box-shadow: 0 0 0 3px rgba(28,30,133,0.1); }
         .copy-field.field-headline {
-            font-size: 22px; font-weight: 700; color: #1a1a1a; line-height: 1.3;
-            padding: 4px 8px;
+            font-size: 20px; font-weight: 700; color: #1a1a1a; line-height: 1.35;
+            padding: 8px 10px; min-height: 48px;
         }
         .copy-field.field-primary-text {
-            font-size: 14px; color: #6B6B6B; line-height: 1.7; padding: 6px 8px;
+            font-size: 13px; color: #4B4B4B; line-height: 1.7; padding: 8px 10px; min-height: 60px;
         }
         .copy-field.field-description {
-            font-size: 13px; color: #6B6B6B; line-height: 1.6; padding: 8px 10px;
-            background: #F8F8F7; border-color: #E8E8E6;
+            font-size: 13px; color: #6B6B6B; line-height: 1.6; padding: 8px 10px; min-height: 42px;
         }
         .copy-field.field-cta {
-            font-size: 13px; font-weight: 600; color: #1d4ed8; padding: 5px 12px;
-            background: #EBF4FF; border-color: #BFDBFE; border-radius: 5px;
-            display: inline-block; width: auto; min-width: 80px;
+            font-size: 13px; font-weight: 600; color: #1d4ed8; padding: 7px 12px;
+            background: #EBF4FF; border-color: #BFDBFE; min-height: 36px;
         }
         .copy-save-indicator {
-            position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-            font-size: 11px; color: #22c55e; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            font-size: 11px; color: #22c55e; margin-left: 8px;
+            opacity: 0; transition: opacity 0.3s; display: inline;
         }
         .copy-save-indicator.visible { opacity: 1; }
         /* legacy static classes (kept for archive status section) */
@@ -1431,33 +1432,29 @@
 
             document.getElementById('expandDetails').innerHTML = `
                 <div class="copy-field-wrap">
-                    <div class="copy-field-label">Headline</div>
-                    <textarea class="copy-field field-headline" data-field="headline" data-id="${v.id}" rows="1"
+                    <span class="copy-field-label">Headline <span class="copy-save-indicator" id="ind-headline">Saved ✓</span></span>
+                    <textarea class="copy-field field-headline" data-field="headline" data-id="${v.id}"
                         oninput="autoResize(this)" onblur="saveCopyField(this)" onkeydown="copyFieldKeydown(event,this)"
                     >${escapeHtml(v.headline)}</textarea>
-                    <span class="copy-save-indicator">Saved</span>
                 </div>
                 <div class="copy-field-wrap">
-                    <div class="copy-field-label">Primary Text</div>
-                    <textarea class="copy-field field-primary-text" data-field="primary_text" data-id="${v.id}" rows="3"
+                    <span class="copy-field-label">Primary Text <span class="copy-save-indicator" id="ind-primary_text">Saved ✓</span></span>
+                    <textarea class="copy-field field-primary-text" data-field="primary_text" data-id="${v.id}"
                         oninput="autoResize(this)" onblur="saveCopyField(this)" onkeydown="copyFieldKeydown(event,this)"
                     >${escapeHtml(v.primary_text)}</textarea>
-                    <span class="copy-save-indicator">Saved</span>
                 </div>
                 <div class="copy-field-wrap">
-                    <div class="copy-field-label">Description</div>
-                    <textarea class="copy-field field-description" data-field="description" data-id="${v.id}" rows="2"
+                    <span class="copy-field-label">Description <span class="copy-save-indicator" id="ind-description">Saved ✓</span></span>
+                    <textarea class="copy-field field-description" data-field="description" data-id="${v.id}"
                         oninput="autoResize(this)" onblur="saveCopyField(this)" onkeydown="copyFieldKeydown(event,this)"
                         placeholder="(optional)"
                     >${escapeHtml(v.description || '')}</textarea>
-                    <span class="copy-save-indicator">Saved</span>
                 </div>
-                <div class="copy-field-wrap" style="margin-bottom:18px;">
-                    <div class="copy-field-label">CTA Button</div>
-                    <textarea class="copy-field field-cta" data-field="cta_button" data-id="${v.id}" rows="1"
+                <div class="copy-field-wrap">
+                    <span class="copy-field-label">CTA Button <span class="copy-save-indicator" id="ind-cta_button">Saved ✓</span></span>
+                    <textarea class="copy-field field-cta" data-field="cta_button" data-id="${v.id}"
                         oninput="autoResize(this)" onblur="saveCopyField(this)" onkeydown="copyFieldKeydown(event,this)"
                     >${escapeHtml(v.cta_button)}</textarea>
-                    <span class="copy-save-indicator">Saved</span>
                 </div>
                 <div class="expand-tags">${allTags}</div>
                 ${statusInfo}
@@ -1468,8 +1465,10 @@
                     ${viewMode === 'archive' ? archiveActions : reviewActions}
                 </div>
             `;
-            // Auto-resize all textareas to fit their initial content
-            document.querySelectorAll('#expandDetails .copy-field').forEach(autoResize);
+            // Run autoResize after layout — rAF ensures the browser has painted the DOM
+            requestAnimationFrame(() => {
+                document.querySelectorAll('#expandDetails .copy-field').forEach(autoResize);
+            });
             document.getElementById('expandOverlay').classList.add('active');
         }
 
@@ -1505,7 +1504,7 @@
             const v = variants.find(x => x.id === variantId);
             if (!v || v[field] === newValue) return;  // no change
 
-            const indicator = el.closest('.copy-field-wrap').querySelector('.copy-save-indicator');
+            const indicator = document.getElementById(`ind-${field}`);
 
             try {
                 const res = await fetch(`${API_BASE}/api/variants/${variantId}`, {
