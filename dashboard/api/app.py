@@ -24,6 +24,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from engine.store import Store
@@ -46,8 +47,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve generated image assets from data/creatives/
-app.mount("/assets", StaticFiles(directory="data/creatives"), name="assets")
+# Serve generated image assets with no-store caching so re-rendered PNGs appear immediately.
+# FastAPI's default StaticFiles sets aggressive cache headers — override with a route instead.
+@app.get("/assets/{full_path:path}")
+async def serve_asset(full_path: str):
+    import os
+    file_path = os.path.join("data/creatives", full_path)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(
+        file_path,
+        headers={"Cache-Control": "no-store"},
+    )
 
 # Initialize services
 store = Store()
