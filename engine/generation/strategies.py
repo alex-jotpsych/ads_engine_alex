@@ -71,6 +71,51 @@ def load_style_notes(strategy_type: str = "global", aspect_ratio: str = "1:1") -
     return "\n\n---\n\n".join(parts) if parts else ""
 
 
+def _headline_to_mood(headline: str) -> str:
+    """
+    Convert a headline string into an abstract mood phrase for illustration prompts.
+
+    Feeding the raw headline (e.g. "Stop Losing Money to Documentation Burnout")
+    directly into Imagen causes it to render the words as signs, labels, or overlays.
+    Instead we strip all specific words and return only the emotional register so the
+    model gets creative direction without any typographic trigger.
+
+    Heuristic rules (no LLM call — keeps generation fast):
+    - Remove possessives, numbers, brand names
+    - Map common emotional registers to painterly mood phrases
+    - Truncate to a short evocative phrase — never a full sentence
+    """
+    h = headline.lower()
+
+    # Map known emotional registers to abstract mood phrases
+    mood_map = [
+        (["burnout", "exhausted", "tired", "overwhelmed", "desk", "late", "clock"],
+         "a figure overwhelmed by invisible weight, seeking calm"),
+        (["save time", "faster", "minutes", "hours", "efficiency", "productivity"],
+         "a figure moving lightly, freed from burden, expansive space around them"),
+        (["connect", "together", "community", "team", "collaboration"],
+         "two figures in quiet connection, warm shared light"),
+        (["grow", "scale", "revenue", "money", "business", "practice"],
+         "a single figure standing with confidence in open space, upward energy"),
+        (["focus", "clarity", "clear", "simple", "ease"],
+         "a calm figure in an uncluttered environment, soft directional light"),
+        (["help", "support", "care", "patient", "client", "therapist"],
+         "a gentle figure in a moment of attentive presence, warm palette"),
+        (["celebrate", "win", "success", "achievement"],
+         "a figure in a moment of quiet joy, expansive background"),
+        (["stress", "anxiety", "pressure", "struggle"],
+         "a figure releasing tension, transitioning from constriction to openness"),
+        (["future", "modern", "ai", "technology", "digital"],
+         "a figure in harmony with abstract geometric forms, calm futurism"),
+    ]
+    for keywords, phrase in mood_map:
+        if any(kw in h for kw in keywords):
+            return phrase
+
+    # Fallback: generic warm mood
+    return "a calm figure in a warm, open space — quiet confidence and ease"
+
+
 # ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
@@ -140,11 +185,22 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
-IMAGEN_ILLUSTRATION_PROMPT = """A warm editorial illustration in flat semi-flat style for a square social media ad. Mood drawn from: "{headline}". Subject: {subject_matter}. Visual direction: {visual_direction}.
+IMAGEN_ILLUSTRATION_PROMPT = """CRITICAL: This image must contain ZERO text, letters, words, numbers, digits, labels, logos, watermarks, signs, captions, or typographic elements of any kind — not even partial letters or abstract letterforms. Pure visual illustration only.
 
-Style similar to Headspace, Calm, or Notion marketing art — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center by the rule of thirds, with open negative space in the top or bottom third for text overlay. Warm, approachable, calming mood appropriate for behavioral health therapists.
+A warm editorial illustration in flat semi-flat style for a social media ad.
 
-No text, letters, words, labels, logos, watermarks, or UI elements anywhere in the image. No photorealistic rendering, no 3D, no photography. No split screens, multiple panels, borders, or frames. No clip art. No dark or corporate aesthetics. No photographic lighting, lens flare, or shadows.
+Emotional mood: {mood_phrase}
+Subject: {subject_matter}
+Visual direction: {visual_direction}
+
+Style: Headspace / Calm / Notion marketing art aesthetic — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center, open negative space in one third for text overlay. Warm, approachable, calming mood for behavioral health therapists.
+
+HARD RESTRICTIONS — violating any of these makes the image unusable:
+- NO text, letters, words, numbers, digits, or letterforms of any kind anywhere in the image
+- NO logos, watermarks, labels, signs, banners, or captions
+- NO photorealistic rendering, 3D, photography, or lens effects
+- NO split screens, multiple panels, borders, or frames
+- NO clip art, dark aesthetics, or corporate imagery
 """
 
 
@@ -174,13 +230,19 @@ class ImagenStrategy(ImageStrategy):
         visual_style = taxonomy.get("visual_style", "photography")
 
         # Pick prompt template based on visual style
+        headline = copy_data["headline"]
         if visual_style == "illustration":
             prompt_template = IMAGEN_ILLUSTRATION_PROMPT
+            # Convert headline to a mood phrase — raw headline text causes Imagen to render
+            # words as signs, labels, or typographic elements in the image.
+            mood_phrase = _headline_to_mood(headline)
         else:
             prompt_template = IMAGEN_PHOTO_PROMPT
+            mood_phrase = headline  # photo template uses {headline} directly
 
         prompt = prompt_template.format(
-            headline=copy_data["headline"],
+            headline=headline,
+            mood_phrase=mood_phrase,
             visual_direction=brief.visual_direction,
             color_mood=taxonomy.get("color_mood", "warm_earth"),
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
@@ -253,11 +315,17 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 """
 
 
-DALLE_ILLUSTRATION_PROMPT = """A warm editorial illustration in flat semi-flat style for a square social media ad. Mood drawn from: "{headline}". Subject: {subject_matter}. Visual direction: {visual_direction}.
+DALLE_ILLUSTRATION_PROMPT = """IMPORTANT: This image must contain absolutely NO text, letters, words, numbers, digits, labels, logos, watermarks, signs, or typographic elements of any kind. Pure visual illustration only.
 
-Style similar to Headspace, Calm, or Notion marketing art — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center by the rule of thirds, with open negative space in the top or bottom third for text overlay. Warm, approachable, calming mood appropriate for behavioral health therapists.
+A warm editorial illustration in flat semi-flat style for a social media ad.
 
-No text, letters, words, labels, logos, watermarks, or UI elements anywhere in the image. No photorealistic rendering, no 3D, no photography. No split screens, multiple panels, borders, or frames. No clip art. No dark or corporate aesthetics. No photographic lighting, lens flare, or shadows.
+Emotional mood: {mood_phrase}
+Subject: {subject_matter}
+Visual direction: {visual_direction}
+
+Style similar to Headspace, Calm, or Notion marketing art — simplified stylized human figures with rounded organic shapes, minimal facial detail, expressive posture. Subtle paper grain or brush texture. Palette of 3-5 colors using deep navy-indigo, soft blush-pink, warm yellow, and electric purple tones. Background is a solid color or soft gradient, uncluttered. Single focal point placed off-center by the rule of thirds, open negative space in one third for text overlay. Warm, approachable, calming mood for behavioral health therapists.
+
+DO NOT include: text, letters, words, numbers, labels, logos, signs, watermarks, UI elements, photorealistic rendering, 3D, photography, split screens, multiple panels, borders, frames, clip art, dark or corporate aesthetics.
 """
 
 
@@ -285,13 +353,17 @@ class DalleStrategy(ImageStrategy):
         taxonomy = copy_data["taxonomy"]
         visual_style = taxonomy.get("visual_style", "photography")
 
+        headline = copy_data["headline"]
         if visual_style == "illustration":
             prompt_template = DALLE_ILLUSTRATION_PROMPT
+            mood_phrase = _headline_to_mood(headline)
         else:
             prompt_template = DALLE_PHOTO_PROMPT
+            mood_phrase = headline
 
         prompt = prompt_template.format(
-            headline=copy_data["headline"],
+            headline=headline,
+            mood_phrase=mood_phrase,
             visual_direction=brief.visual_direction,
             color_mood=taxonomy.get("color_mood", "warm_earth"),
             subject_matter=taxonomy.get("subject_matter", "clinician_at_work"),
