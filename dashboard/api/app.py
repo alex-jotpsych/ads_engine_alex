@@ -92,6 +92,11 @@ class DeployRequest(BaseModel):
     destination_url: Optional[str] = None
 
 
+class ExportRequest(BaseModel):
+    variant_ids: list[str]
+    display_map: dict[str, str]  # { "1": "variant-uuid", ... }
+
+
 # ---------------------------------------------------------------------------
 # Intake
 # ---------------------------------------------------------------------------
@@ -638,6 +643,49 @@ async def deploy_variant_to_meta(body: DeployRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Meta API error: {e}")
+
+
+@app.post("/api/export")
+async def export_variants_endpoint(body: ExportRequest):
+    """
+    Export selected ad variants as downloadable ad card PNG images.
+
+    Each card shows the generated ad image at its native aspect ratio,
+    with headline, primary text, description, and CTA button below.
+
+    Single variant  → returns image/png
+    Multiple variants → returns application/zip
+    """
+    import asyncio
+    from fastapi.responses import Response
+    from dashboard.api.export import run_export
+
+    if not body.variant_ids:
+        raise HTTPException(status_code=400, detail="No variant IDs provided")
+
+    missing = []
+    for vid in body.variant_ids:
+        try:
+            store.get_variant(vid)
+        except FileNotFoundError:
+            missing.append(vid)
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Variants not found: {missing}")
+
+    try:
+        # run_export uses sync Playwright — run in thread pool to avoid blocking the event loop
+        loop = asyncio.get_event_loop()
+        content_bytes, content_type, filename = await loop.run_in_executor(
+            None, run_export, body.variant_ids, body.display_map, store
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {e}")
+
+    return Response(
+        content=content_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.post("/api/meta/poll-status")

@@ -480,6 +480,11 @@
             <button class="reject" onclick="showRejectModal()">Reject</button>
             <button onclick="selectAll()">Select All</button>
             <button onclick="clearSelection()">Clear</button>
+            <div class="toolbar-divider"></div>
+            <button id="exportBtn" onclick="exportSelected()"
+                    style="color:#1d4ed8;border-color:#bfdbfe;background:#eff6ff;">
+                Export
+            </button>
         </span>
         <span id="archiveFilters" style="display:none;">
             <button class="archive-filter active" data-status="all" onclick="setArchiveFilter('all')">All</button>
@@ -998,6 +1003,51 @@
         function clearSelection() {
             selectedIds.clear();
             renderGallery();
+        }
+
+        async function exportSelected() {
+            if (!selectedIds.size) return;
+            const btn = document.getElementById('exportBtn');
+            const orig = btn.textContent;
+            btn.textContent = `Exporting ${selectedIds.size}…`;
+            btn.disabled = true;
+            try {
+                const res = await fetch(`${API_BASE}/api/export`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        variant_ids: [...selectedIds],
+                        display_map: displayMap,
+                    }),
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+                    throw new Error(err.detail || `HTTP ${res.status}`);
+                }
+                // Extract filename from Content-Disposition header
+                const disposition = res.headers.get('Content-Disposition') || '';
+                const nameMatch = disposition.match(/filename="([^"]+)"/);
+                const contentType = res.headers.get('Content-Type') || '';
+                const fallback = contentType.includes('zip') ? 'jotpsych_ads_export.zip' : 'ad_export.png';
+                const filename = nameMatch ? nameMatch[1] : fallback;
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                showToast(`Exported ${selectedIds.size} ad${selectedIds.size !== 1 ? 's' : ''} — check your downloads`);
+            } catch (e) {
+                showToast(`Export failed: ${e.message}`, { type: 'error' });
+            } finally {
+                btn.textContent = orig;
+                btn.disabled = false;
+            }
         }
 
         // ---------------------------------------------------------------
