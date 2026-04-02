@@ -150,7 +150,6 @@ class ImageStrategy(ABC):
 IMAGEN_PHOTO_PROMPT = """Generate a single cohesive photograph for a Meta (Facebook/Instagram) feed ad.
 
 Context (for mood only — do NOT illustrate the headline literally):
-Product: JotPsych — AI-powered clinical documentation for behavioral health therapists.
 Mood reference: "{headline}"
 Visual direction: {visual_direction}
 Color mood: {color_mood}
@@ -159,16 +158,16 @@ Subject: {subject_matter}
 THIS IS A SINGLE PHOTOGRAPH — NOT a collage, NOT a before/after, NOT a split screen, NOT a comparison. One unified image with ONE scene, ONE moment, ONE subject.
 
 PHOTOGRAPHIC REQUIREMENTS:
-- Shot on a Canon EOS R5, 35mm lens, f/2.8, natural window light
-- Real location: modern therapy office, warm wood tones, plants, soft textures
-- If a person is present: candid moment, not posed. Real clothing, real skin texture, visible pores. No perfect symmetry.
+- Shot on a Canon EOS R5, 35mm lens, f/2.8, natural or soft indoor light
+- The subject is a person in their PERSONAL TIME — at home, in an everyday setting, NOT at work
+- Choose one of these real-life settings: a warmly lit living room or kitchen in the evening, a bedroom at night with soft lamp light, a person arriving home or stepping outside after a long day, a quiet moment of personal time where work is intruding unexpectedly (a glowing phone on a nightstand, a laptop open on a couch, paperwork on a kitchen table)
+- If a person is present: direct, intense eye contact with the camera is strongly preferred — this is the scroll-stopping device. Candid feel, not posed. Real clothing, real skin texture, visible pores. No perfect symmetry.
 - Shallow depth of field with soft background bokeh
 - Color grade: slightly warm, lifted shadows, muted highlights — like an indie film still
 
 COMPOSITION:
 - ONE single focal point — one person or one object
 - Leave clear negative space for text overlay (top third or bottom third)
-- Square format (1:1 aspect ratio) for Meta feed
 - Subject placed using rule of thirds, not centered
 - Simple, uncluttered background
 
@@ -179,6 +178,9 @@ ABSOLUTE RESTRICTIONS — the image MUST NOT contain:
 - Overly smooth or plastic-looking skin
 - HDR-overprocessed or oversaturated colors
 - Stock photo poses (thumbs up, pointing at camera, exaggerated smiles)
+- Clinical or therapy settings: therapy offices, waiting rooms, exam rooms, medical environments
+- White coats, scrubs, stethoscopes, or any visual shorthand for "clinician at work"
+- Non-eye-contact "contemplative" shots (looking out a window, staring into middle distance, facing away)
 - Generic corporate office backgrounds
 - Lens flare or dramatic lighting effects
 - Laptop/phone screens showing UI (unless subject_matter is product_ui)
@@ -477,13 +479,21 @@ Do NOT write any @font-face or @import rules for fonts. The fonts are injected a
 
 ### Logo
 The JotPsych logo SVG will be automatically injected into your HTML after generation.
-You MUST include an empty placeholder div for it:
-  <div class="jotpsych-logo"></div>
+You MUST include an empty placeholder div for it, with a data-logo attribute indicating which variant to use:
+
+  For DARK backgrounds (deep navy, dark indigo, dark purple, black):
+    <div class="jotpsych-logo" data-logo="light"></div>
+
+  For LIGHT backgrounds (white, blush pink, pale yellow, light gray):
+    <div class="jotpsych-logo" data-logo="dark"></div>
+
+Rule of thumb: if your background color has luminance below 40%, use data-logo="light". Otherwise use data-logo="dark".
+
 Place it in the TOP-LEFT corner of the ad. Style it with CSS only:
 - Position: absolute, top: {logo_top}px, left: {logo_left}px
 - Width: {logo_width}px, z-index: 10
 - Add a subtle drop shadow via CSS filter for contrast
-- Do NOT attempt to write SVG paths or recreate the logo — just place the empty div with the class name
+- Do NOT attempt to write SVG paths or recreate the logo — just place the empty div with the correct data-logo attribute
 
 ### Layout Rules
 - Root container: exactly {canvas_w}px × {canvas_h}px, overflow hidden
@@ -515,7 +525,7 @@ Place it in the TOP-LEFT corner of the ad. Style it with CSS only:
 - Output ONLY the raw HTML. No explanation, no markdown fences, no commentary whatsoever.
 - Completely self-contained (all CSS inline in a <style> tag, no external resources)
 - Do NOT write any @font-face, @import, or <link> tags for fonts — they are injected automatically. Just use font-family: 'Archivo' and 'Inter' in your CSS.
-- Do NOT write any <svg> tags or SVG path data — the logo is injected automatically into the .jotpsych-logo div
+- Do NOT write any <svg> tags or SVG path data — the logo is injected automatically into the .jotpsych-logo div based on data-logo="light" or data-logo="dark"
 - Root element must be exactly {canvas_w}px × {canvas_h}px
 - Use the provided headline and CTA text EXACTLY as given — do not rewrite copy
 - Every text element must be perfectly centered horizontally
@@ -533,8 +543,8 @@ Tone: {tone}
 
 Remember:
 - Use Archivo for headings and Inter for body text (fonts are injected automatically)
-- Include an empty <div class="jotpsych-logo"></div> in the top-left (the real logo SVG is injected automatically)
-- Do NOT write any SVG code — just the empty div with the class
+- Include an empty <div class="jotpsych-logo" data-logo="light OR dark"></div> in the top-left — choose light for dark backgrounds, dark for light backgrounds
+- Do NOT write any SVG code — just the empty div with the correct data-logo attribute
 - Pick ONE color palette from the brand guide based on the color mood
 - Use flexbox centering, keep it minimal
 - Canvas is {canvas_w}×{canvas_h}px — do NOT hardcode 1080×1080 if the dimensions differ
@@ -563,8 +573,9 @@ class HtmlCssStrategy(ImageStrategy):
     description = "HTML/CSS graphic ads — gradients, typography, patterns (no AI imagery)"
 
     # Cached brand assets (loaded once per process, heavy font data stays out of prompts)
-    _brand_font_faces: Optional[str] = None  # ~2MB base64 — only injected at screenshot time
-    _brand_logo_svg: Optional[str] = None    # ~14KB SVG — safe to include in prompts
+    _brand_font_faces: Optional[str] = None   # ~2MB base64 — only injected at screenshot time
+    _brand_logo_dark: Optional[str] = None    # primary_dark.svg — for light backgrounds
+    _brand_logo_light: Optional[str] = None   # primary_light.svg — for dark backgrounds
 
     def __init__(self):
         self.anthropic = Anthropic()
@@ -572,16 +583,74 @@ class HtmlCssStrategy(ImageStrategy):
     def is_available(self) -> bool:
         return bool(os.getenv("ANTHROPIC_API_KEY"))
 
-    def _load_logo_svg(self) -> str:
-        """Load the primary logo SVG for injection into prompts (~14KB, safe for context)."""
-        if HtmlCssStrategy._brand_logo_svg is not None:
-            return HtmlCssStrategy._brand_logo_svg
-        logo_path = BRAND_DIR / "logos" / "primary_dark.svg"
-        if logo_path.exists():
-            HtmlCssStrategy._brand_logo_svg = logo_path.read_text().strip()
+    def _load_logo_svg(self, variant: str = "dark") -> str:
+        """Load a primary logo SVG by variant ('dark' or 'light').
+
+        dark  = primary_dark.svg  — use on light/white backgrounds
+        light = primary_light.svg — use on dark/colored backgrounds
+        """
+        if variant == "light":
+            if HtmlCssStrategy._brand_logo_light is not None:
+                return HtmlCssStrategy._brand_logo_light
+            path = BRAND_DIR / "logos" / "primary_light.svg"
+            HtmlCssStrategy._brand_logo_light = path.read_text().strip() if path.exists() else ""
+            return HtmlCssStrategy._brand_logo_light
         else:
-            HtmlCssStrategy._brand_logo_svg = ""
-        return HtmlCssStrategy._brand_logo_svg
+            if HtmlCssStrategy._brand_logo_dark is not None:
+                return HtmlCssStrategy._brand_logo_dark
+            path = BRAND_DIR / "logos" / "primary_dark.svg"
+            HtmlCssStrategy._brand_logo_dark = path.read_text().strip() if path.exists() else ""
+            return HtmlCssStrategy._brand_logo_dark
+
+    @staticmethod
+    def _hex_luminance(hex_color: str) -> float:
+        """Return relative luminance (0=black, 1=white) for a hex color string."""
+        h = hex_color.lstrip("#")
+        if len(h) == 3:
+            h = "".join(c * 2 for c in h)
+        if len(h) != 6:
+            return 0.5  # unknown — treat as mid-tone
+        r, g, b = int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255
+
+        def lin(c: float) -> float:
+            return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+        return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+
+    @staticmethod
+    def _detect_logo_variant(html: str) -> str:
+        """Determine which logo to use for the given HTML.
+
+        Priority:
+        1. data-logo attribute on the .jotpsych-logo div (set by Claude)
+        2. Luminance of the ad container's background color (fallback auto-detect)
+        3. Default to 'dark' (safe for most light-background cases)
+        """
+        # 1. Explicit attribute set by Claude
+        attr_match = re.search(r'class="jotpsych-logo"[^>]*data-logo="(light|dark)"', html)
+        if not attr_match:
+            attr_match = re.search(r'data-logo="(light|dark)"[^>]*class="jotpsych-logo"', html)
+        if attr_match:
+            return attr_match.group(1)
+
+        # 2. Auto-detect from background color of the root container
+        bg_match = re.search(
+            r'\.ad-container\s*\{[^}]*background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})',
+            html,
+            flags=re.DOTALL,
+        )
+        if not bg_match:
+            # Also check inline style on the root div
+            bg_match = re.search(
+                r'background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,6})',
+                html,
+            )
+        if bg_match:
+            lum = HtmlCssStrategy._hex_luminance(bg_match.group(1))
+            return "light" if lum < 0.35 else "dark"
+
+        # 3. Safe default
+        return "dark"
 
     def _load_font_face_css(self) -> str:
         """Load @font-face CSS with base64-encoded fonts. Only for Playwright rendering, never for prompts.
@@ -628,19 +697,13 @@ class HtmlCssStrategy(ImageStrategy):
         if font_face_css and "<style>" in html:
             html = html.replace("<style>", f"<style>\n{font_face_css}\n", 1)
 
-        logo_svg = self._load_logo_svg()
+        logo_variant = self._detect_logo_variant(html)
+        logo_svg = self._load_logo_svg(logo_variant)
         if logo_svg:
-            # Inject real SVG into the placeholder div Claude left for us
-            placeholder = '<div class="jotpsych-logo"></div>'
-            if placeholder in html:
-                html = html.replace(
-                    placeholder,
-                    f'<div class="jotpsych-logo">{logo_svg}</div>',
-                    1,
-                )
-            # Also handle case where Claude put content inside (shouldn't, but defensive)
-            elif 'class="jotpsych-logo"' in html:
-                        html = re.sub(
+            # Inject real SVG into the placeholder div Claude left for us.
+            # Match any .jotpsych-logo div regardless of data-logo attribute.
+            if 'class="jotpsych-logo"' in html:
+                html = re.sub(
                     r'<div class="jotpsych-logo"[^>]*>.*?</div>',
                     f'<div class="jotpsych-logo">{logo_svg}</div>',
                     html,
