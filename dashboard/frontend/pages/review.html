@@ -1091,12 +1091,20 @@
 
         async function approveSelected() {
             if (!selectedIds.size) return;
+            const ids = [...selectedIds];
             await fetch(`${API_BASE}/api/review/approve`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate' }),
+                body: JSON.stringify({ variant_ids: ids, reviewer: 'nate' }),
             });
             selectedIds.clear();
-            viewMode === 'archive' ? loadArchive() : loadReviewQueue();
+            if (viewMode === 'review') {
+                // Remove approved variants from the in-memory list — no server round-trip
+                variants = variants.filter(v => !ids.includes(v.id));
+            } else {
+                // In archive, update their status in-memory
+                ids.forEach(id => { const v = variants.find(x => x.id === id); if (v) v.status = 'approved'; });
+            }
+            renderGallery();
         }
 
         function showRejectModal() {
@@ -1111,17 +1119,23 @@
         async function rejectSelected() {
             const notes = document.getElementById('rejectNotes').value;
             if (!notes.trim()) { showToast('Please enter rejection feedback'); return; }
+            const ids = [...selectedIds];
             try {
                 const res = await fetch(`${API_BASE}/api/review/reject`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ variant_ids: [...selectedIds], reviewer: 'nate', notes, display_map: displayMap }),
+                    body: JSON.stringify({ variant_ids: ids, reviewer: 'nate', notes, display_map: displayMap }),
                 });
                 const data = await res.json();
                 closeRejectModal();
                 selectedIds.clear();
                 const routingNote = data.feedback_routing === 'per_ad' ? ` (routed to ${data.per_ad_feedback?.length || 0} ads)` : '';
                 showToast(`Rejected ${data.rejected} variant(s)${routingNote}`);
-                viewMode === 'archive' ? loadArchive() : loadReviewQueue();
+                if (viewMode === 'review') {
+                    variants = variants.filter(v => !ids.includes(v.id));
+                } else {
+                    ids.forEach(id => { const v = variants.find(x => x.id === id); if (v) v.status = 'rejected'; });
+                }
+                renderGallery();
             } catch (e) { showToast(`Error rejecting variants: ${e.message}`, {type:'error'}); }
         }
 
@@ -1516,13 +1530,11 @@
                     const err = await res.json().catch(() => ({}));
                     throw new Error(err.detail || `HTTP ${res.status}`);
                 }
-                // Update in-memory variant so re-renders pick up the change
+                // Update in-memory variant so future re-renders pick up the change
                 v[field] = newValue;
-                // Flash "Saved" indicator
+                // Flash "Saved" indicator — no gallery re-render needed
                 indicator.classList.add('visible');
                 setTimeout(() => indicator.classList.remove('visible'), 1800);
-                // Refresh the gallery card (headline may have changed)
-                renderGallery();
             } catch (e) {
                 showToast(`Save failed: ${e.message}`, { type: 'error' });
                 // Revert field to last known good value
@@ -1536,7 +1548,9 @@
                 body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
             });
             showToast('Returned to review queue');
-            loadArchive();
+            closeExpand();
+            variants = variants.filter(v => v.id !== id);
+            renderGallery();
         }
 
         // ---------------------------------------------------------------
@@ -1618,7 +1632,14 @@
                 const data = await res.json();
                 closeDeployModal();
                 showToast(`Submitted to Meta — Ad ID: ${data.meta_ad_id}`);
-                loadArchive();
+                // Update variant in-memory — no reload needed
+                const dv = variants.find(x => x.id === deployVariantId);
+                if (dv) {
+                    dv.status = 'live';
+                    dv.meta_ad_id = data.meta_ad_id;
+                    dv.meta_review_status = data.meta_review_status;
+                }
+                renderGallery();
             } catch (e) {
                 showDeployError(`Deploy failed:\n${e.message}`);
                 btn.disabled = false;
@@ -1631,7 +1652,14 @@
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ variant_ids: [id], reviewer: 'nate' }),
             });
-            viewMode === 'archive' ? loadArchive() : loadReviewQueue();
+            closeExpand();
+            if (viewMode === 'review') {
+                variants = variants.filter(v => v.id !== id);
+            } else {
+                const v = variants.find(x => x.id === id);
+                if (v) v.status = 'approved';
+            }
+            renderGallery();
         }
 
         // ---------------------------------------------------------------
